@@ -136,6 +136,7 @@ jobs:
           #branch_name="appstudio-${{ inputs.component }}-konflux-replicator"
           #branch_name="appstudio-${{ inputs.component }}-konflux-replicator-${{ inputs.version }}"
           branch_name="appstudio-${{ inputs.component }}-konflux-replicator-${{ inputs.version }}-$(date +%s)"
+          echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
 
           git checkout -B "$branch_name" ${{ inputs.release_branch }}
       
@@ -177,6 +178,6 @@ jobs:
           gh pr create \
             --repo "${REPOSITORY}" \
             --base "${{ inputs.release_branch }}" \
-            --head "appstudio-${{ inputs.component }}-konflux-replicator-${{ inputs.version }}-$(date +%s)" \
+            --head "${BRANCH_NAME}" \
             --title "Update Tekton files to version ${{ inputs.version }}" \
             --body "This PR updates the \`output-image\` tags and CEL expressions in \`.tekton/\` to version \`${{ inputs.version }}\` and branch \`${{ inputs.release_branch }}\`."
