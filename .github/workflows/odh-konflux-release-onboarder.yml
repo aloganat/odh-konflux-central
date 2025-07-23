@@ -43,6 +43,8 @@ on:
           - llm-d-inference-scheduler
           - llm-d-routing-sidecar
           - llama-stack-k8s-operator
+          - odh-data-science-pipelines-argo-argoexec
+          - odh-data-science-pipelines-argo-workflowcontroller
           # Add all valid components here
       release_branch:
         description: 'Target Release Branch'

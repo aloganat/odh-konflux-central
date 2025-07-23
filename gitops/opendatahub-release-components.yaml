@@ -1609,3 +1609,40 @@ spec:
       dockerfileUrl: Dockerfile
       revision: odh
       url: https://github.com/opendatahub-io/llama-stack-k8s-operator
+
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    mintmaker.appstudio.redhat.com/disabled: true
+    build.appstudio.openshift.io/request: configure-pac-no-mr
+  name: odh-data-science-pipelines-argo-argoexec
+spec:
+  application: opendatahub-release
+  componentName: odh-data-science-pipelines-argo-argoexec
+  containerImage: quay.io/opendatahub/ds-pipelines-argo-argoexec
+  source:
+    git:
+      dockerfileUrl: argo-argoexec/Dockerfile.ODH
+      revision: konflux-poc
+      url: https://github.com/opendatahub-io/argo-workflows
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    mintmaker.appstudio.redhat.com/disabled: true
+    build.appstudio.openshift.io/request: configure-pac-no-mr
+  name: odh-data-science-pipelines-argo-workflowcontroller
+spec:
+  application: opendatahub-release
+  componentName: odh-data-science-pipelines-argo-workflowcontroller
+  containerImage: quay.io/opendatahub/ds-pipelines-argo-workflowcontroller
+  source:
+    git:
+      dockerfileUrl: argo-workflowcontroller/Dockerfile.ODH
+      revision: konflux-poc
+      url: https://github.com/opendatahub-io/argo-workflows
