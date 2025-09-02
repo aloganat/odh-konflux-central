@@ -78,3 +78,4 @@ llm-d-inference-scheduler,quay.io/opendatahub/llm-d-inference-scheduler
 llm-d-routing-sidecar,quay.io/opendatahub/llm-d-routing-sidecar
 odh-data-science-pipelines-argo-argoexec,quay.io/opendatahub/ds-pipelines-argo-argoexec
 odh-data-science-pipelines-argo-workflowcontroller,quay.io/opendatahub/ds-pipelines-argo-workflowcontroller
+guardrails-builtin-detectors
