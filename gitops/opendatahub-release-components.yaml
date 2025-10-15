@@ -1810,3 +1810,21 @@ spec:
       revision: "genai-poc"
       url: https://github.com/opendatahub-io/odh-dashboard
 ---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    mintmaker.appstudio.redhat.com/disabled: true
+    build.appstudio.openshift.io/request: configure-pac-no-mr
+  name: kube-auth-proxy
+spec:
+  application: opendatahub-release
+  componentName: kube-auth-proxy
+  containerImage: quay.io/opendatahub/kube-auth-proxy
+  source:
+    git:
+      dockerfileUrl: Dockerfile
+      revision: main
+      url: https://github.com/opendatahub-io/kube-auth-proxy.git
+---

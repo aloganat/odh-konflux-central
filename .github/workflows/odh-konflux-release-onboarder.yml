@@ -46,6 +46,7 @@ on:
           - odh-data-science-pipelines-argo-argoexec
           - odh-data-science-pipelines-argo-workflowcontroller
           - odh-model-metadata-collection
+          - kube-auth-proxy
           # Add all valid components here
       release_branch:
         description: 'Target Release Branch'
