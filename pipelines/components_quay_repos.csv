@@ -80,3 +80,4 @@ odh-data-science-pipelines-argo-argoexec,quay.io/opendatahub/ds-pipelines-argo-a
 odh-data-science-pipelines-argo-workflowcontroller,quay.io/opendatahub/ds-pipelines-argo-workflowcontroller
 guardrails-builtin-detectors
 kube-auth-proxy,quay.io/opendatahub/kube-auth-proxy
+llama-stack-provider-ragas,quay.io/opendatahub/llama-stack-provider-ragas
