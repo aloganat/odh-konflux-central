@@ -651,6 +651,15 @@ spec:
       optional: true
     - name: netrc
       optional: true
+    taskRunSpecs:
+    - pipelineTaskName: build-container
+      stepSpecs:
+      - name: build
+        computeResources:
+          requests:
+            memory: 20Gi
+          limits:
+            memory: 20Gi
   taskRunTemplate:
     serviceAccountName: build-pipeline-fms-guardrails-orchestrator
   workspaces:
