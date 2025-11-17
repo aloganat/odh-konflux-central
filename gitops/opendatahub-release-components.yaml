@@ -166,10 +166,10 @@ metadata:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
-  name: odh-kube-auth-proxy
+  name: kube-auth-proxy
 spec:
   application: opendatahub-release
-  componentName: odh-kube-auth-proxy
+  componentName: kube-auth-proxy
   containerImage: quay.io/opendatahub/odh-kube-auth-proxy
   source:
     git:
