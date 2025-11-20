@@ -47,6 +47,7 @@ on:
           - odh-model-metadata-collection
           - kube-auth-proxy
           - llama-stack-provider-ragas
+          - mlserver
           # Add all valid components here
       release_branch:
         description: 'Target Release Branch'

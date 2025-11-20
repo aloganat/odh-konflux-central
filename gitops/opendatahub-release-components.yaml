@@ -1890,3 +1890,23 @@ spec:
       revision: main
       url: https://github.com/opendatahub-io/notebooks.git
 ---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/request: configure-pac-no-mr
+    mintmaker.appstudio.redhat.com/disabled: "true"
+  name: mlserver
+  namespace: open-data-hub-tenant
+spec:
+  application: opendatahub-release
+  componentName: mlserver
+  containerImage: quay.io/opendatahub/mlserver
+  source:
+    git:
+      context: .
+      dockerfileUrl: Dockerfile
+      revision: master
+      url: https://github.com/opendatahub-io/MLServer.git
+---
