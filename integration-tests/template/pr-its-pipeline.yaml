@@ -28,6 +28,8 @@ spec:
           value: $(params.SNAPSHOT)
     - name: check-prerequisites
       description: check prerequisites if the ITS needs to execute
+      runAfter:
+        - parse-metadata
       taskSpec:
         results:
         - name: event-type
@@ -46,6 +48,8 @@ spec:
             echo -n "${EVENT_TYPE}" > $(results.event-type.path)
     - name: find-component-image
       description: Placeholder task that prints the Snapshot and outputs standard TEST_OUTPUT
+      runAfter:
+        - check-prerequisites
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
@@ -73,10 +77,10 @@ spec:
       when:
         - input: "$(tasks.check-prerequisites.results.event-type)"
           operator: in
-          values: ["pull_request"]
+          values: ["pull_request", "retest-all-comment"]
     - name: provision-eaas-space
       runAfter:
-        - parse-metadata
+        - check-prerequisites
       taskRef:
         resolver: git
         params:
@@ -94,7 +98,7 @@ spec:
       when:
         - input: "$(tasks.check-prerequisites.results.event-type)"
           operator: in
-          values: ["pull_request"]
+          values: ["pull_request", "retest-all-comment"]
     - name: provision-cluster
       runAfter:
         - provision-eaas-space
@@ -150,3 +154,47 @@ spec:
         - input: "$(tasks.check-prerequisites.results.event-type)"
           operator: in
           values: ["pull_request"]
+    - name: deploy-and-test
+      runAfter:
+        - provision-cluster
+      params:
+      - name: git-url
+        value: "$(tasks.parse-metadata.results.source-git-url)"
+      - name: git-rev
+        value: "$(tasks.parse-metadata.results.target-git-branch)"
+      - name: component-image
+        value: "$(tasks.parse-metadata.results.component-container-image)"
+      taskSpec:
+        volumes:
+          - name: credentials
+            emptyDir: {}
+        steps:
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+          - name: deploy-and-e2e
+            image: quay.io/rhoai/rhoai-task-toolset:its
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            workingDir: /workspace/source
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+            script: |
+              oc get pods
+              oc whoami
