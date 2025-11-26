@@ -29,7 +29,7 @@ spec:
     - name: find-component-image
       description: Placeholder task that prints the Snapshot and outputs standard TEST_OUTPUT
       runAfter:
-        - check-prerequisites
+        - parse-metadata
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
