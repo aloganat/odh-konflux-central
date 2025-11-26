@@ -21,9 +21,5 @@ spec:
       value: main
     - name: pathInRepo
       value: integration-tests/opendatahub-operator/e2e-test.yaml
-    - name: token
-      value: github-token-secret
-    - name: tokenKey
-      value: token
     resolver: git
     resourceKind: pipeline
