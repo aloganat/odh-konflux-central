@@ -1910,3 +1910,22 @@ spec:
       revision: master
       url: https://github.com/opendatahub-io/MLServer.git
 ---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    mintmaker.appstudio.redhat.com/disabled: true
+    build.appstudio.openshift.io/request: configure-pac-no-mr
+  name: trainer
+spec:
+  application: opendatahub-release
+  componentName: trainer
+  containerImage: quay.io/opendatahub/trainer
+  source:
+    git:
+      context: .
+      dockerfileUrl: cmd/trainer-controller-manager/Dockerfile.odh
+      revision: master
+      url: https://github.com/opendatahub-io/trainer.git
+---

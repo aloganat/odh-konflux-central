@@ -48,6 +48,7 @@ on:
           - kube-auth-proxy
           - llama-stack-provider-ragas
           - mlserver
+          - trainer
           # Add all valid components here
       release_branch:
         description: 'Target Release Branch'
