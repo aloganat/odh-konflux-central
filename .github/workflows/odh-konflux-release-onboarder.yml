@@ -49,6 +49,8 @@ on:
           - llama-stack-provider-ragas
           - mlserver
           - trainer
+          - mlflow
+          - mlflow-operator
           # Add all valid components here
       release_branch:
         description: 'Target Release Branch'
