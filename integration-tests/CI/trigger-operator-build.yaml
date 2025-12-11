@@ -116,6 +116,10 @@ spec:
             RESULT=false
             echo "EVENT_TYPE=${EVENT_TYPE}"
             echo "COMPONENT_NAME=${COMPONENT_NAME}"
+            echo "OPERATOR_COMPONENT_NAME=${OPERATOR_COMPONENT_NAME}"
+            echo "BUNDLE_COMPONENT_NAME=${BUNDLE_COMPONENT_NAME}"
+            echo "FBCF_COMPONENT_NAME=${FBCF_COMPONENT_NAME}"
+            
             # [[ "${EVENT_TYPE}" == "push" ]] && 
             
             if [[ "${COMPONENT_NAME}" != *"${OPERATOR_COMPONENT_NAME}"* ]] && [[ "${COMPONENT_NAME}" != *"${BUNDLE_COMPONENT_NAME}"* ]] && [[ "${COMPONENT_NAME}" != *"${FBCF_COMPONENT_NAME}"* ]]
