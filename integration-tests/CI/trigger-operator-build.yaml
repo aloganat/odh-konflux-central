@@ -78,10 +78,21 @@ spec:
       description: check prerequisites if the ITS needs to execute
       runAfter:
         - find-component-image
+      params:
+      - name: OPERATOR_COMPONENT_NAME
+        value: $(params.OPERATOR-COMPONENT-NAME)
+      - name: BUNDLE_COMPONENT_NAME
+        value: $(params.BUNDLE-COMPONENT-NAME)
+      - name: FBCF_COMPONENT_NAME
+        value: $(params.FBCF-COMPONENT-NAME)
       taskSpec:
         results:
         - name: success
           description: "stores the result of prerequisite check"
+        params:
+        - name: OPERATOR_COMPONENT_NAME
+        - name: BUNDLE_COMPONENT_NAME
+        - name: FBCF_COMPONENT_NAME
         steps:
         - image: quay.io/konflux-ci/konflux-test:stable
           env:
@@ -117,7 +128,18 @@ spec:
       description: Trigger the operator build
       runAfter:
         - check-prerequisites
+      params:
+      - name: OPERATOR_COMPONENT_NAME
+        value: $(params.OPERATOR-COMPONENT-NAME)
+      - name: OPERATOR_REPO_NAME
+        value: $(params.OPERATOR-REPO-NAME)
+      - name: OPERATOR_BRANCH_NAME
+        value: $(params.OPERATOR-BRANCH-NAME)
       taskSpec:
+        params:
+        - name: OPERATOR_COMPONENT_NAME
+        - name: OPERATOR_REPO_NAME
+        - name: OPERATOR_BRANCH_NAME
         steps:
         - image: quay.io/rhoai/rhoai-task-toolset:its
           env:
