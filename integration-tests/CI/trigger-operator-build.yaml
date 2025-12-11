@@ -79,20 +79,20 @@ spec:
       runAfter:
         - find-component-image
       params:
-      - name: OPERATOR_COMPONENT_NAME
+      - name: OPERATOR-COMPONENT-NAME
         value: $(params.OPERATOR-COMPONENT-NAME)
-      - name: BUNDLE_COMPONENT_NAME
+      - name: BUNDLE-COMPONENT-NAME
         value: $(params.BUNDLE-COMPONENT-NAME)
-      - name: FBCF_COMPONENT_NAME
+      - name: FBCF-COMPONENT-NAME
         value: $(params.FBCF-COMPONENT-NAME)
       taskSpec:
         results:
         - name: success
           description: "stores the result of prerequisite check"
         params:
-        - name: OPERATOR_COMPONENT_NAME
-        - name: BUNDLE_COMPONENT_NAME
-        - name: FBCF_COMPONENT_NAME
+        - name: OPERATOR-COMPONENT-NAME
+        - name: BUNDLE-COMPONENT-NAME
+        - name: FBCF-COMPONENT-NAME
         steps:
         - image: quay.io/konflux-ci/konflux-test:stable
           env:
@@ -129,17 +129,17 @@ spec:
       runAfter:
         - check-prerequisites
       params:
-      - name: OPERATOR_COMPONENT_NAME
+      - name: OPERATOR-COMPONENT-NAME
         value: $(params.OPERATOR-COMPONENT-NAME)
-      - name: OPERATOR_REPO_NAME
+      - name: OPERATOR-REPO-NAME
         value: $(params.OPERATOR-REPO-NAME)
-      - name: OPERATOR_BRANCH_NAME
+      - name: OPERATOR-BRANCH-NAME
         value: $(params.OPERATOR-BRANCH-NAME)
       taskSpec:
         params:
-        - name: OPERATOR_COMPONENT_NAME
-        - name: OPERATOR_REPO_NAME
-        - name: OPERATOR_BRANCH_NAME
+            - name: OPERATOR-COMPONENT-NAME
+            - name: OPERATOR-REPO-NAME
+            - name: OPERATOR-BRANCH-NAME
         steps:
         - image: quay.io/rhoai/rhoai-task-toolset:its
           env:
