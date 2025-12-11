@@ -137,6 +137,7 @@ spec:
             set -e
             LATEST_COMMIT_SHA=$(git ls-remote https://github.com/${OPERATOR_REPO_NAME}.git refs/heads/${OPERATOR_BRANCH_NAME} | awk '{print $1}')
             echo "LATEST_COMMIT_SHA=${LATEST_COMMIT_SHA}"
+            echo "GITHUB_TOKEN=${GITHUB_TOKEN}"
             curl -X POST https://api.github.com/repos/${OPERATOR_REPO_NAME}/commits/${LATEST_COMMIT_SHA}/comments -H "Accept: application/vnd.github+json"  -H "Authorization: Bearer ${GITHUB_TOKEN}"  -H "Content-Type: application/json" -d '{"body": "/test ${OPERATOR_COMPONENT_NAME}-on-push branch:${OPERATOR_BRANCH_NAME}"}'
       when:
         - input: "$(tasks.check-prerequisites.results.success)"
