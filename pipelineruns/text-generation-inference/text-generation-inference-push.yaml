@@ -1,0 +1,69 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/text-generation-inference?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "$$TARGET_BRANCH$$"
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: opendatahub-release
+    appstudio.openshift.io/component: text-generation-inference
+    pipelines.appstudio.openshift.io/type: build
+  name: text-generation-inference-on-push
+  namespace: open-data-hub-tenant
+spec:
+  timeouts:
+    pipeline: 8h
+    tasks: 4h
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/opendatahub/text-generation-inference:$$OUTPUT_IMAGE_TAG$$
+  - name: dockerfile
+    value: Dockerfile
+  - name: path-context
+    value: .
+  - name: hermetic
+    value: false
+  - name: build-source-image
+    value: false
+  - name: build-image-index
+    value: false
+  - name: rebuild
+    value: true
+  - name: skip-checks
+    value: true
+  - name: build-args
+    value:
+    - DOCKER_BUILDKIT=1
+    - BUILDKIT_PROGRESS=plain
+  - name: fetch-git-tags
+    value: true
+  - name: clone-depth
+    value: "2147483647"
+  - name: build-platform
+    value: linux-extra-fast/amd64
+  pipelineRef:
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/opendatahub-io/odh-konflux-central.git
+    - name: revision
+      value: '{{ target_branch }}'
+    - name: pathInRepo
+      value: pipeline/container-build.yaml
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-text-generation-inference
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
