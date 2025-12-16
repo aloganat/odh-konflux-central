@@ -150,7 +150,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: odh-github-secret
-                  key: token
+                  key: operator-ci-token
             - name: OPERATOR_COMPONENT_NAME
               value: "$(params.OPERATOR-COMPONENT-NAME)"
             - name: OPERATOR_REPO_NAME
