@@ -2,19 +2,20 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/notebooks?rev={{revision}}
+    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/llama-stack-distribution?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( "base-images/cpu/ubi9-python-3.12/**".pathChanged() || ".tekton/odh-base-image-cpu-py312-ubi9-push.yaml".pathChanged() )
+      == "konflux-poc-1" && ( "distribution/***".pathChanged() || ".tekton/odh-llama-stack-core-poc-push.yaml".pathChanged()
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: opendatahub-release
-    appstudio.openshift.io/component: odh-base-image-cpu-py312-ubi9
+    appstudio.openshift.io/component: odh-llama-stack-core-poc
     pipelines.appstudio.openshift.io/type: build
-  name: odh-base-image-cpu-py312-ubi9-on-push
+  name: odh-llama-stack-core-poc-on-push
   namespace: open-data-hub-tenant
 spec:
   params:
@@ -23,19 +24,22 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/opendatahub/odh-base-image-cpu-py312-ubi9:{{revision}}
+    value: quay.io/opendatahub/llama-stack:odh-stable
   - name: dockerfile
-    value: base-images/cpu/ubi9-python-3.12/Dockerfile.cpu
+    value: distribution/Containerfile
   - name: path-context
     value: .
-  - name: build-platforms
-    value:
-    - linux/x86_64
-    - linux/arm64
   pipelineRef:
-    name: multiarch-push-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/opendatahub-io/odh-konflux-central.git
+    - name: revision
+      value: '{{ target_branch }}'
+    - name: pathInRepo
+      value: pipeline/container-build.yaml
   taskRunTemplate:
-    serviceAccountName: build-pipeline-odh-base-image-cpu-py312-ubi9
+    serviceAccountName: build-pipeline-odh-llama-stack-core-poc
   workspaces:
   - name: git-auth
     secret:
