@@ -2,19 +2,19 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/notebooks?rev={{revision}}
+    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/maas-billing?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( "base-images/cpu/c9s-python-3.12/**".pathChanged() || ".tekton/odh-base-image-cpu-py312-c9s-push.yaml".pathChanged() )
+      == "konflux-poc-1"
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: opendatahub-release
-    appstudio.openshift.io/component: odh-base-image-cpu-py312-c9s
+    appstudio.openshift.io/component: maas-api-poc
     pipelines.appstudio.openshift.io/type: build
-  name: odh-base-image-cpu-py312-c9s-on-push
+  name: maas-api-poc-on-push
   namespace: open-data-hub-tenant
 spec:
   params:
@@ -23,19 +23,22 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/opendatahub/odh-base-image-cpu-py312-c9s:{{revision}}
+    value: quay.io/opendatahub/maas-api:odh-stable
   - name: dockerfile
-    value: base-images/cpu/c9s-python-3.12/Dockerfile.cpu
+    value: maas-api/Dockerfile
   - name: path-context
-    value: .
-  - name: build-platforms
-    value:
-    - linux/x86_64
-    - linux/arm64
+    value: maas-api
   pipelineRef:
-    name: multiarch-push-pipeline
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/opendatahub-io/odh-konflux-central.git
+    - name: revision
+      value: '{{ target_branch }}'
+    - name: pathInRepo
+      value: pipeline/container-build.yaml
   taskRunTemplate:
-    serviceAccountName: build-pipeline-odh-base-image-cpu-py312-c9s
+    serviceAccountName: build-pipeline-maas-api-poc
   workspaces:
   - name: git-auth
     secret:
