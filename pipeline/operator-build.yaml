@@ -1,13 +1,10 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: container-build
+  name: operator-build
 spec:
   description: |
-    This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
-
-    _Uses `buildah` to create a multi-platform container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. This pipeline requires that the [multi platform controller](https://github.com/konflux-ci/multi-platform-controller) is deployed and configured on your Konflux instance. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://conforma.dev/docs/policy/packages/release_trusted_task.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
-    This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build-multi-platform-oci-ta?tab=tags)_
+    This pipeline is ideal for building operator image with the custom tasks responsible for all the prerequsites and preparation
   params:
   - description: Source Repository URL
     name: git-url
@@ -62,6 +59,9 @@ spec:
     description: Add built image into an OCI image index
     name: build-image-index
     type: string
+  - default: "false"
+    description: Enable cache proxy configuration
+    name: enable-cache-proxy
   - default: []
     description: Array of --build-arg values ("arg=value" strings) for buildah
     name: build-args
@@ -77,6 +77,10 @@ spec:
   - default: "does-not-exist"
     description: Kubernetes secret to mount into build, see https://www.redhat.com/en/blog/sensitive-data-containers
     name: additional-build-secret
+    type: string
+  - default: "opendatahub-io/odh-build-metadata"
+    description: Build metadata repo
+    name: build-metadata-repo
     type: string
   - default: "synk-secret"
     description: Synk Token Secret Name
@@ -192,38 +196,73 @@ spec:
     workspaces:
     - name: basic-auth
       workspace: git-auth
-  - name: prefetch-dependencies
+  - name: prefetch-manifests
     params:
-    - name: input
-      value: $(params.prefetch-input)
-    - name: dev-package-managers
-      value: "true"
     - name: SOURCE_ARTIFACT
       value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
     - name: ociStorage
       value: $(params.output-image).prefetch
     - name: ociArtifactExpiresAfter
-      value: $(params.image-expires-after)
-    - name: log-level
-      value: $(params.prefetch-log-level)
-    - name: config-file-content
-      value: $(params.prefetch-config-file-content)
+      value: "1h"
+    - name: utilsRepoBranch
+      value: "odh"
+    - name: buildVersionTag
+      value: "odh-stable"
     runAfter:
     - clone-repository
     taskRef:
       params:
-      - name: name
-        value: prefetch-dependencies-oci-ta
-      - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.2@sha256:3fa0204a481044b21f0e784ce39cbd25e8fb49c664a5458f3eef351fff1c906e
-      - name: kind
-        value: task
-      resolver: bundles
+      - name: url
+        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks
+      - name: revision
+        value: "odh"
+      - name: pathInRepo
+        value: "konflux-tekton-tasks/prefetch-operand-manifests-oci-ta/0.1/prefetch-operand-manifests-oci-ta.yaml"
+      resolver: git
     workspaces:
     - name: git-basic-auth
       workspace: git-auth
     - name: netrc
       workspace: netrc
+  - name: audit-manifests
+    description: audit the collected manifests
+    runAfter:
+    - prefetch-manifests
+    taskSpec:
+      volumes:
+      - name: workdir
+        emptyDir: {}
+      stepTemplate:
+        volumeMounts:
+          - mountPath: /var/workdir
+            name: workdir
+      steps:
+        - name: use-trusted-artifact
+          image: quay.io/redhat-appstudio/build-trusted-artifacts:latest@sha256:81c4864dae6bb11595f657be887e205262e70086a05ed16ada827fd6391926ac
+          args:
+            - use
+            - $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)=/var/workdir/source
+            - $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)=/var/workdir/cachi2
+        - image: quay.io/rhoai/rhoai-task-toolset:latest
+          env:
+          - name: SOURCE_ARTIFACT
+            value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
+          - name: CACHI2_ARTIFACT
+            value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
+          script: |
+            echo "SOURCE_ARTIFACT=${SOURCE_ARTIFACT}"
+            echo "CACHI2_ARTIFACT=${CACHI2_ARTIFACT}"
+            echo "exploring manifests"
+            ls /var/workdir/cachi2
+            ls /var/workdir/cachi2/prefetched-manifests
+
+            echo "exploring sources"
+            ls /var/workdir/source
+
+    workspaces:
+    - name: basic-auth
+      workspace: git-auth
+
   - matrix:
       params:
       - name: PLATFORM
@@ -265,15 +304,15 @@ spec:
       - git.url=$(params.git-url)
       - git.commit=$(params.revision)
     - name: SOURCE_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
     - name: IMAGE_APPEND_PLATFORM
       value: "true"
     - name: BUILDAH_FORMAT
       value: $(params.buildah-format)
     runAfter:
-    - prefetch-dependencies
+    - audit-manifests
     taskRef:
       params:
       - name: name
@@ -326,9 +365,9 @@ spec:
     - name: BINARY_IMAGE_DIGEST
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
     - name: SOURCE_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
     runAfter:
     - build-image-index
     taskRef:
@@ -431,9 +470,9 @@ spec:
     - name: image-url
       value: $(tasks.build-image-index.results.IMAGE_URL)
     - name: SOURCE_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
     runAfter:
     - build-image-index
     taskRef:
@@ -504,9 +543,9 @@ spec:
     - name: BUILD_ARGS_FILE
       value: $(params.build-args-file)
     - name: SOURCE_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
     runAfter:
     - coverity-availability-check
     taskRef:
@@ -551,9 +590,9 @@ spec:
     - name: image-url
       value: $(tasks.build-image-index.results.IMAGE_URL)
     - name: SOURCE_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
     runAfter:
     - build-image-index
     taskRef:
@@ -577,9 +616,9 @@ spec:
     - name: image-url
       value: $(tasks.build-image-index.results.IMAGE_URL)
     - name: SOURCE_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
     runAfter:
     - build-image-index
     taskRef:
@@ -627,7 +666,7 @@ spec:
     - name: CONTEXT
       value: $(params.path-context)
     - name: SOURCE_ARTIFACT
-      value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+      value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     runAfter:
     - build-image-index
     taskRef:
@@ -683,6 +722,83 @@ spec:
         script: |
           echo "Success"
   finally:
+  - name: push-build-metadata
+    description: push-build-metadata
+    params:
+    - name: build-metadata-repo
+      value: "$(params.build-metadata-repo)"
+    taskSpec:
+      params:
+      - name: build-metadata-repo
+      volumes:
+      - name: workdir
+        emptyDir: {}
+      stepTemplate:
+        volumeMounts:
+          - mountPath: /var/workdir
+            name: workdir
+      steps:
+        - name: use-trusted-artifact
+          image: quay.io/redhat-appstudio/build-trusted-artifacts:latest@sha256:81c4864dae6bb11595f657be887e205262e70086a05ed16ada827fd6391926ac
+          args:
+            - use
+            - $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)=/var/workdir/source
+            - $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)=/var/workdir/cachi2
+        - image: quay.io/rhoai/rhoai-task-toolset:latest
+          env:
+          - name: SOURCE_ARTIFACT
+            value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
+          - name: CACHI2_ARTIFACT
+            value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
+          - name: OUTPUT_IMAGE_DIGEST
+            value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+          - name: BUILD_METADATA_REPO
+            value: "$(params.build-metadata-repo)"
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: odh-github-secret
+                key: build-metadata-token
+          script: |
+            echo "SOURCE_ARTIFACT=${SOURCE_ARTIFACT}"
+            echo "CACHI2_ARTIFACT=${CACHI2_ARTIFACT}"
+            echo "exploring manifests"
+            ls /var/workdir/cachi2
+            ls /var/workdir/cachi2/prefetched-manifests
+            
+            echo "exploring sources"
+            ls /var/workdir/source
+            
+            echo "****************** pushing the changes to odh-build-metadata ************************"
+            META_DIR=/var/workdir/odh-build-metadata
+            mkdir -p ${META_DIR}
+            cd ${META_DIR}
+            git config --global init.defaultBranch main
+            git config --global user.name "OpenShift-AI-DevOps"
+            git config --global user.email "openshift-ai-devops@redhat.com"
+            git init
+            git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git"
+            git config core.sparseCheckout true
+            git config core.sparseCheckoutCone false
+            echo "components/odh-operator/docs" >> .git/info/sparse-checkout
+            git fetch --depth=1 origin main
+            git checkout main
+            
+            #add content to new-dir    
+            OUTPUT_IMAGE_DIGEST=${OUTPUT_IMAGE_DIGEST/sha256:/}
+            mkdir -p components/odh-operator/${OUTPUT_IMAGE_DIGEST}/manifests
+            cp -r /var/workdir/cachi2/prefetched-manifests/* components/odh-operator/${OUTPUT_IMAGE_DIGEST}/manifests
+            cp /var/workdir/source/build/operands-map.yaml components/odh-operator/${OUTPUT_IMAGE_DIGEST}
+            cp /var/workdir/source/build/manifests-config.yaml components/odh-operator/${OUTPUT_IMAGE_DIGEST}
+
+            git add --sparse components/odh-operator/${OUTPUT_IMAGE_DIGEST}
+            git commit -m "build-meta for operator image ${OUTPUT_IMAGE_DIGEST}"
+            git push
+            
+
+    workspaces:
+    - name: basic-auth
+      workspace: git-auth
   - name: show-sbom
     params:
     - name: IMAGE_URL
