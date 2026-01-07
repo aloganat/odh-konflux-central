@@ -1,49 +1,49 @@
----
-apiVersion: appstudio.redhat.com/v1alpha1
-kind: Application
-metadata:
-  annotations:
-    application.thumbnail: "8"
-  name: "opendatahub-builds"
-spec:
-  displayName: "opendatahub-builds"
----
-apiVersion: appstudio.redhat.com/v1alpha1
-kind: Component
-metadata:
-  annotations:
-    build.appstudio.openshift.io/request: configure-pac-no-mr
-    mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"fbc-builder","bundle":"latest"}'
-  name: odh-fbc-fragment-ci
-spec:
-  application: opendatahub-builds
-  componentName: odh-fbc-fragment-ci
-  containerImage: quay.io/opendatahub/opendatahub-operator-catalog
-  source:
-    git:
-      context: catalog/v4.19
-      dockerfileUrl: Dockerfile
-      revision: "stable"
-      url: https://github.com/opendatahub-io/opendatahub-operator
----
-apiVersion: appstudio.redhat.com/v1alpha1
-kind: Component
-metadata:
-  annotations:
-    build.appstudio.openshift.io/request: configure-pac-no-mr
-    mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
-  name: odh-operator-bundle-ci
-spec:
-  application: opendatahub-builds
-  componentName: odh-operator-bundle-ci
-  containerImage: quay.io/opendatahub/opendatahub-operator-bundle
-  source:
-    git:
-      dockerfileUrl: Dockerfiles/bundle.Dockerfile
-      revision: "stable"
-      url: https://github.com/opendatahub-io/opendatahub-operator
+#---
+#apiVersion: appstudio.redhat.com/v1alpha1
+#kind: Application
+#metadata:
+#  annotations:
+#    application.thumbnail: "8"
+#  name: "opendatahub-builds"
+#spec:
+#  displayName: "opendatahub-builds"
+#---
+#apiVersion: appstudio.redhat.com/v1alpha1
+#kind: Component
+#metadata:
+#  annotations:
+#    build.appstudio.openshift.io/request: configure-pac-no-mr
+#    mintmaker.appstudio.redhat.com/disabled: true
+#    build.appstudio.openshift.io/pipeline: '{"name":"fbc-builder","bundle":"latest"}'
+#  name: odh-fbc-fragment-ci
+#spec:
+#  application: opendatahub-builds
+#  componentName: odh-fbc-fragment-ci
+#  containerImage: quay.io/opendatahub/opendatahub-operator-catalog
+#  source:
+#    git:
+#      context: catalog/v4.19
+#      dockerfileUrl: Dockerfile
+#      revision: "main"
+#      url: https://github.com/opendatahub-io/ODH-Build-Config
+#---
+#apiVersion: appstudio.redhat.com/v1alpha1
+#kind: Component
+#metadata:
+#  annotations:
+#    build.appstudio.openshift.io/request: configure-pac-no-mr
+#    mintmaker.appstudio.redhat.com/disabled: true
+#    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+#  name: odh-operator-bundle-ci
+#spec:
+#  application: opendatahub-builds
+#  componentName: odh-operator-bundle-ci
+#  containerImage: quay.io/opendatahub/opendatahub-operator-bundle
+#  source:
+#    git:
+#      dockerfileUrl: Dockerfiles/bundle.Dockerfile
+#      revision: "main"
+#      url: https://github.com/opendatahub-io/ODH-Build-Config
 ---
 apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
@@ -1243,7 +1243,6 @@ metadata:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-mod-arch-gen-ai-ci
 spec:
   application: opendatahub-builds
