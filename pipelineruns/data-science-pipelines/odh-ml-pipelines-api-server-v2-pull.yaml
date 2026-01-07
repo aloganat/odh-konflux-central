@@ -18,6 +18,8 @@ metadata:
   namespace: open-data-hub-tenant
 spec:
   params:
+# pipeline-type, additional-tags
+# check why linux-extra-fast/amd64 as the default value in contianer build pipeline
   - name: git-url
     value: '{{source_url}}'
   - name: revision
@@ -37,7 +39,7 @@ spec:
     - name: url
       value: https://github.com/opendatahub-io/odh-konflux-central.git
     - name: revision
-      value: '{{ target_branch }}'
+      value: '{{ target_branch }}' # branch name of the konflux-central, needs to be main
     - name: pathInRepo
       value: pipeline/container-build.yaml
   taskRunTemplate:
