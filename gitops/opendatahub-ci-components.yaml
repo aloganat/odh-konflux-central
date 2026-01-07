@@ -33,7 +33,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-operator-bundle-ci
 spec:
   application: opendatahub-builds
@@ -51,7 +51,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-operator-ci
 spec:
   application: opendatahub-builds
@@ -69,7 +69,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-dashboard-ci
 spec:
   application: opendatahub-builds
@@ -89,7 +89,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-data-science-pipelines-operator-controller-ci
 spec:
   application: opendatahub-builds
@@ -108,7 +108,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-kf-notebook-controller-ci
 spec:
   application: opendatahub-builds
@@ -127,7 +127,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-kuberay-operator-controller-ci
 spec:
   application: opendatahub-builds
@@ -146,7 +146,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: kube-auth-proxy-ci
 spec:
   application: opendatahub-builds
@@ -165,7 +165,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-ml-pipelines-api-server-v2-ci
 spec:
   application: opendatahub-builds
@@ -184,7 +184,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-ml-pipelines-driver-ci
 spec:
   application: opendatahub-builds
@@ -203,7 +203,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-ml-pipelines-launcher-ci
 spec:
   application: opendatahub-builds
@@ -222,7 +222,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-ml-pipelines-persistenceagent-v2-ci
 spec:
   application: opendatahub-builds
@@ -241,7 +241,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-ml-pipelines-scheduledworkflow-v2-ci
 spec:
   application: opendatahub-builds
@@ -260,7 +260,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-mlmd-grpc-server-ci
 spec:
   application: opendatahub-builds
@@ -279,7 +279,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-model-controller-ci
 spec:
   application: opendatahub-builds
@@ -298,7 +298,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-notebook-controller-ci
 spec:
   application: opendatahub-builds
@@ -317,7 +317,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-training-operator-ci
 spec:
   application: opendatahub-builds
@@ -336,7 +336,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-trustyai-service-operator-ci
 spec:
   application: opendatahub-builds
@@ -355,7 +355,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-trustyai-service-ci
 spec:
   application: opendatahub-builds
@@ -374,7 +374,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-model-registry-ci
 spec:
   application: opendatahub-builds
@@ -393,7 +393,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-model-registry-ci
 spec:
   application: opendatahub-builds
@@ -412,7 +412,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-model-registry-operator-ci
 spec:
   application: opendatahub-builds
@@ -431,7 +431,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-feast-operator-ci
 spec:
   application: opendatahub-builds
@@ -450,7 +450,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-feature-server-ci
 spec:
   application: opendatahub-builds
@@ -469,7 +469,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: kserve-agent-ci
 spec:
   application: opendatahub-builds
@@ -488,7 +488,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: kserve-controller-ci
 spec:
   application: opendatahub-builds
@@ -507,7 +507,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: kserve-router-ci
 spec:
   application: opendatahub-builds
@@ -526,7 +526,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: kserve-storage-initializer-ci
 spec:
   application: opendatahub-builds
@@ -545,7 +545,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: caikit-nlp-ci
 spec:
   application: opendatahub-builds
@@ -564,7 +564,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: ta-lmes-driver-ci
 spec:
   application: opendatahub-builds
@@ -583,7 +583,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: ta-lmes-job-ci
 spec:
   application: opendatahub-builds
@@ -602,7 +602,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: fms-guardrails-orchestrator-ci
 spec:
   application: opendatahub-builds
@@ -621,7 +621,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: trustyai-vllm-orchestrator-gateway-ci
 spec:
   application: opendatahub-builds
@@ -640,7 +640,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: fms-guardrails-regex-detector-ci
 spec:
   application: opendatahub-builds
@@ -658,7 +658,7 @@ kind: Component
 metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
   name: fms-guardrails-hf-detector-ci
 spec:
@@ -678,7 +678,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: nudge-only-notebooks-ci
 spec:
   application: opendatahub-builds
@@ -695,7 +695,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-rstudio-minimal-cpu-py311-c9s-ci
@@ -716,7 +716,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-rstudio-minimal-cuda-py311-c9s-ci
@@ -737,7 +737,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-minimal-cpu-py312-ubi9-ci
@@ -758,7 +758,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-minimal-cuda-py312-ubi9-ci
@@ -779,7 +779,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-minimal-rocm-py312-ubi9-ci
@@ -800,7 +800,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-datascience-cpu-py312-ubi9-ci
@@ -821,7 +821,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-pytorch-cuda-py312-ubi9-ci
@@ -842,7 +842,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-pytorch-rocm-py312-ubi9-ci
@@ -863,7 +863,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-tensorflow-cuda-py312-ubi9-ci
@@ -884,7 +884,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-trustyai-cpu-py312-ubi9-ci
@@ -905,7 +905,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-pipeline-runtime-datascience-cpu-py312-ubi9-ci
@@ -926,7 +926,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-pipeline-runtime-minimal-cpu-py312-ubi9-ci
@@ -947,7 +947,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-pipeline-runtime-pytorch-cuda-py312-ubi9-ci
@@ -968,7 +968,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-pipeline-runtime-pytorch-rocm-py312-ubi9-ci
@@ -989,7 +989,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-pipeline-runtime-tensorflow-cuda-py312-ubi9-ci
@@ -1010,7 +1010,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-pipeline-runtime-tensorflow-rocm-py312-ubi9-ci
@@ -1031,7 +1031,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-codeserver-datascience-cpu-py312-ubi9-ci
@@ -1053,7 +1053,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: caikit-tgis-serving-ci
@@ -1072,7 +1072,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: openvino-model-server-ci
@@ -1091,7 +1091,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: text-generation-inference-ci
@@ -1110,7 +1110,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: llm-d-inference-scheduler-ci
@@ -1128,7 +1128,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: llm-d-routing-sidecar-ci
@@ -1145,7 +1145,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: llama-stack-k8s-operator-ci
@@ -1165,7 +1165,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-data-science-pipelines-argo-argoexec-ci
@@ -1183,7 +1183,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-data-science-pipelines-argo-workflowcontroller-ci
@@ -1202,7 +1202,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-model-registry-mod-arch-ci
@@ -1222,7 +1222,7 @@ metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: true
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
   name: odh-model-metadata-collection-ci
 spec:
   application: opendatahub-builds
@@ -1241,7 +1241,7 @@ kind: Component
 metadata:
   annotations:
     build.appstudio.openshift.io/request: configure-pac-no-mr
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-mod-arch-gen-ai-ci
@@ -1260,7 +1260,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: kube-auth-proxy-ci
@@ -1278,7 +1278,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: llama-stack-provider-ragas-ci
@@ -1296,7 +1296,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: mlserver-ci
@@ -1316,7 +1316,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-training-rocm64-torch28-py312-ci
@@ -1336,7 +1336,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-training-rocm62-torch25-py311-ci
@@ -1356,7 +1356,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-training-rocm62-torch24-py311-ci
@@ -1376,7 +1376,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-training-cuda128-torch28-py312-ci
@@ -1396,7 +1396,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-training-cuda124-torch25-py311-ci
@@ -1416,7 +1416,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-training-cuda121-torch24-py311-ci
@@ -1436,7 +1436,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-pipeline-runtime-pytorch-llmcompressor-cuda-py312-ci
@@ -1456,7 +1456,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     build.appstudio.openshift.io/request: configure-pac-no-mr
     mintmaker.appstudio.redhat.com/disabled: "true"
   name: odh-workbench-jupyter-pytorch-llmcompressor-cuda-ci
@@ -1476,7 +1476,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-workbench-jupyter-tensorflow-rocm-py312-ci
@@ -1495,7 +1495,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-built-in-detector-ci
@@ -1514,7 +1514,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name: odh-llama-stack-core-ci
@@ -1533,7 +1533,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
     mintmaker.appstudio.redhat.com/disabled: true
     build.appstudio.openshift.io/request: configure-pac-no-mr
   name:  odh-maas-api-ci

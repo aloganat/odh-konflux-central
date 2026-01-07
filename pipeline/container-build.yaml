@@ -113,6 +113,10 @@ spec:
     default: "false"
     type: string
     description: Show a slack notification on failure
+  - name: pipeline-type
+    type: string
+    default: push
+    description: Type of pipeline execution (push)
   results:
   - description: ""
     name: IMAGE_URL
@@ -726,6 +730,10 @@ spec:
       operator: in
       values:
       - "true"
+    - input: $(params.pipeline-type)
+      operator: in
+      values:
+        - "push"
   workspaces:
   - name: git-auth
     optional: true
