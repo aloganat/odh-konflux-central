@@ -796,6 +796,10 @@ spec:
             git push
             
 
+    when:
+    - input: "$(tasks.build-image-index.status)"
+      operator: in
+      values: ["Succeeded"]
     workspaces:
     - name: basic-auth
       workspace: git-auth
