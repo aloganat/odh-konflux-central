@@ -82,6 +82,14 @@ spec:
     description: Build metadata repo
     name: build-metadata-repo
     type: string
+  - default: "odh-stable"
+    description: Build Version Tag to be used for fetching component images
+    name: build-version-tag
+    type: string
+  - default: "main"
+    description: Utils repo branch
+    name: utils-repo-branch
+    type: string
   - default: "synk-secret"
     description: Synk Token Secret Name
     name: synk-secret
@@ -209,9 +217,9 @@ spec:
     - name: ociArtifactExpiresAfter
       value: "1h"
     - name: utilsRepoBranch
-      value: "odh"
+      value: $(params.utils-repo-branch)
     - name: buildVersionTag
-      value: "odh-stable"
+      value: $(params.build-version-tag)
     runAfter:
     - clone-repository
     taskRef:
