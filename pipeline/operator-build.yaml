@@ -87,7 +87,7 @@ spec:
     name: synk-secret
   - name: build-platforms
     default:
-    - linux-extra-fast/amd64
+    - linux/x86_64
     description: List of platforms to build the container images on. The available set of values is determined by the configuration of the multi-platform-controller.
   - description: Additional labels to add to build image
     name: additional-labels
@@ -117,6 +117,10 @@ spec:
     default: "false"
     type: string
     description: Show a slack notification on failure
+  - name: pipeline-type
+    type: string
+    default: push
+    description: Type of pipeline execution (push)
   results:
   - description: ""
     name: IMAGE_URL
@@ -558,7 +562,7 @@ spec:
         value: task
       resolver: bundles
     when:
-    - input: "true"
+    - input: $(params.skip-checks)
       operator: in
       values:
       - "false"
@@ -846,6 +850,10 @@ spec:
       operator: in
       values:
       - "true"
+    - input: $(params.pipeline-type)
+      operator: in
+      values:
+        - "push"
   workspaces:
   - name: git-auth
     optional: true
