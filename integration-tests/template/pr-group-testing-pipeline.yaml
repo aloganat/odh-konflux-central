@@ -199,7 +199,7 @@ spec:
               - name: credentials
                 value: credentials
           - name: deploy-and-e2e
-            image: quay.io/rhoai/rhoai-task-toolset:its
+            image: quay.io/rhoai/rhoai-task-toolset:go-its
             env:
               - name: KUBECONFIG
                 value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
