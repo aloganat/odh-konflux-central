@@ -229,14 +229,14 @@ spec:
               cd src_code
               git checkout ${REVISION}
               
-              # export RUN_ON_OPENSHIFT_CI=true
-              # cd infra/feast-operator
-              # make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
-              # oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
-              # make test-e2e
-              # make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+              export RUN_ON_OPENSHIFT_CI=true
+              cd infra/feast-operator
+              make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+              oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
+              make test-e2e
+              make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
               
-              # make test-previous-version
-              # oc delete deployment feast-operator-controller-manager -n feast-operator-system
+              make test-previous-version
+              oc delete deployment feast-operator-controller-manager -n feast-operator-system
               
-              # make test-upgrade
+              make test-upgrade
