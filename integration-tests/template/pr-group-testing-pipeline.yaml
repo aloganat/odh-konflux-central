@@ -60,12 +60,22 @@ spec:
               
               components=$(jq -c '.components[]' <<< "${SNAPSHOT}")
               snapshotUrlUrlWithoutSuffix=$(echo $SNAPSHOT_URL | sed 's/\.git$//')
+              echo "snapshotUrlUrlWithoutSuffix=${snapshotUrlUrlWithoutSuffix}"
+              
               while read components
               do
                 componentUrl=$(echo "$components" | jq -r '.source.git.url')
+                echo "componentUrl=${componentUrl}"
+              
                 componentUrlWithoutSuffix=$(echo $componentUrl | sed 's/\.git$//')
+                echo "componentUrlWithoutSuffix=${componentUrlWithoutSuffix}"
+              
                 name=$(echo "$components" | jq -r '.name')
+                echo "name=${name}"
+              
                 componentSha=$(echo "$components" | jq -r '.source.git.revision')
+                echo "componentSha=${componentSha}"
+              
                   # Check if component git url equals to snapshot git url, if yes check if the snapshot SHA equals to component SHA
                   if [[ $componentUrlWithoutSuffix == $snapshotUrlUrlWithoutSuffix ]]; then
                       if [[ $componentSha != $SNAPSHOT_SHA ]]; then
