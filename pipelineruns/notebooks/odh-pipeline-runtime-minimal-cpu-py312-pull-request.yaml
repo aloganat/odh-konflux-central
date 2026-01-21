@@ -12,7 +12,7 @@ metadata:
       && body.repository.full_name == "opendatahub-io/notebooks"
   labels:
     appstudio.openshift.io/application: opendatahub-builds
-    appstudio.openshift.io/component: odh-pipeline-runtime-minimal-cpu-py312
+    appstudio.openshift.io/component: odh-pipeline-runtime-minimal-cpu-py312-ubi9-ci
     pipelines.appstudio.openshift.io/type: build
   name: odh-pipeline-runtime-minimal-cpu-py312-on-pull-request
   namespace: open-data-hub-tenant
@@ -23,7 +23,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/opendatahub/odh-pipeline-runtime-minimal-cpu-py312-ubi9:{{revision}}
+    value: quay.io/opendatahub/odh-pipeline-runtime-minimal-cpu-py312-ubi9:odh-pr
   - name: dockerfile
     value: runtimes/minimal/ubi9-python-3.12/Dockerfile.cpu
   - name: path-context
@@ -32,8 +32,6 @@ spec:
     value: runtimes/minimal/ubi9-python-3.12/build-args/cpu.conf
   - name: additional-tags
     value:
-    - '{{target_branch}}-{{revision}}'
-    - 'odh-pr'
     - 'odh-pr-{{revision}}'
   - name: pipeline-type
     value: pull-request
