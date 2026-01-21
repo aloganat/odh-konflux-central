@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    "pipelinesascode.tekton.dev/on-cel-expression": target_url == "https://github.com/opendatahub-io/odh-konflux-central"
+    pipelinesascode.tekton.dev/on-cel-expression: target_url == "https://github.com/opendatahub-io/odh-konflux-central"
   name: odh-group-test-feast
   namespace: open-data-hub-tenant
 spec:
