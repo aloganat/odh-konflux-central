@@ -55,6 +55,7 @@ spec:
             script: |
               #!/bin/bash
               set -e
+              sleep 10m
               echo "SNAPSHOT_URL=${SNAPSHOT_URL}"
               echo "SNAPSHOT_SHA=${SNAPSHOT_SHA}"
               

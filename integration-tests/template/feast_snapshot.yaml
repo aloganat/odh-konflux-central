@@ -1,0 +1,135 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Snapshot
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/feast?rev=03f89001716cf7c1a01a9602bc5ff21073a8a9a5
+    build.appstudio.redhat.com/commit_sha: 03f89001716cf7c1a01a9602bc5ff21073a8a9a5
+    build.appstudio.redhat.com/pull_request_number: "3"
+    build.appstudio.redhat.com/target_branch: stable
+    pac.test.appstudio.openshift.io/branch: stable
+    pac.test.appstudio.openshift.io/cancel-in-progress: "false"
+#    pac.test.appstudio.openshift.io/check-run-id: "61002937033"
+    pac.test.appstudio.openshift.io/controller-info: '{"name":"default","configmap":"pipelines-as-code","secret":"pipelines-as-code-secret",
+      "gRepo": "pipelines-as-code"}'
+    pac.test.appstudio.openshift.io/event-type: on-comment
+    pac.test.appstudio.openshift.io/git-auth-secret: pac-gitauth-xiqqgu
+    pac.test.appstudio.openshift.io/git-provider: github
+    pac.test.appstudio.openshift.io/installation-id: "50075448"
+    pac.test.appstudio.openshift.io/log-url: https://konflux-ui.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/ns/open-data-hub-tenant/pipelinerun/feast-on-pull-request-x6h96
+    pac.test.appstudio.openshift.io/max-keep-runs: "3"
+    pac.test.appstudio.openshift.io/on-cel-expression: event == "pull_request" &&
+      target_branch == "stable"
+    pac.test.appstudio.openshift.io/on-comment: ^/build feast
+    pac.test.appstudio.openshift.io/original-prname: feast-on-pull-request
+    pac.test.appstudio.openshift.io/pull-request: "3"
+    pac.test.appstudio.openshift.io/repo-url: https://github.com/rhoai-rhtap/feast
+    pac.test.appstudio.openshift.io/repository: feast
+    pac.test.appstudio.openshift.io/scm-reporting-plr-started: "true"
+    pac.test.appstudio.openshift.io/sender: dchourasia
+    pac.test.appstudio.openshift.io/sha: 03f89001716cf7c1a01a9602bc5ff21073a8a9a5
+    pac.test.appstudio.openshift.io/sha-title: feast testing
+    pac.test.appstudio.openshift.io/sha-url: https://github.com/rhoai-rhtap/feast/commit/03f89001716cf7c1a01a9602bc5ff21073a8a9a5
+    pac.test.appstudio.openshift.io/source-branch: poc
+    pac.test.appstudio.openshift.io/source-repo-url: https://github.com/rhoai-rhtap/feast
+    pac.test.appstudio.openshift.io/state: queued
+    pac.test.appstudio.openshift.io/url-org: rhoai-rhtap
+    pac.test.appstudio.openshift.io/url-repository: feast
+    test.appstudio.openshift.io/integration-workflow: pull-request
+    test.appstudio.openshift.io/pipelinerunstarttime: "1768991394"
+    test.appstudio.openshift.io/pr-group: poc
+    test.appstudio.openshift.io/snapshot-creation-report: BuildPLRInProgress
+    test.appstudio.openshift.io/source-repo-url: https://github.com/rhoai-rhtap/feast
+  generateName: poc-
+  generation: 1
+  labels:
+    appstudio.openshift.io/application: poc
+    appstudio.openshift.io/build-pipelinerun: feast-on-pull-request-x6h96
+    appstudio.openshift.io/component: feast
+    pac.test.appstudio.openshift.io/cancel-in-progress: "false"
+#    pac.test.appstudio.openshift.io/check-run-id: "61002937032"
+    pac.test.appstudio.openshift.io/event-type: on-comment
+    pac.test.appstudio.openshift.io/original-prname: feast-on-pull-request
+    pac.test.appstudio.openshift.io/pull-request: "3"
+    pac.test.appstudio.openshift.io/repository: feast
+    pac.test.appstudio.openshift.io/sha: 03f89001716cf7c1a01a9602bc5ff21073a8a9a5
+    pac.test.appstudio.openshift.io/state: queued
+    pac.test.appstudio.openshift.io/url-org: rhoai-rhtap
+    pac.test.appstudio.openshift.io/url-repository: feast
+    test.appstudio.openshift.io/pipelinerunfinishtime: "1768991844"
+    test.appstudio.openshift.io/type: component
+  name: poc-gtzgs
+  namespace: open-data-hub-tenant
+spec:
+  application: poc
+  artifacts: {}
+  components:
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133
+    name: odh-ci-fbc-fragment
+    source:
+      git:
+        context: catalog/v4.20
+        dockerfileUrl: Dockerfile
+        revision: 8d4c702d06496795dbd5a56df9814a843ccd4da0
+        url: https://github.com/opendatahub-io/ODH-Build-Config
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-operator-rhoai-rhtap@sha256:705be17695301553e96752a2379a4b1e492a67b476a02e04c6a902b8b45cb09d
+    name: odh-ci-operator-rhoai-rhtap
+    source:
+      git:
+        dockerfileUrl: Dockerfiles/Dockerfile
+        revision: 5be6c319aaad33815d7e6b27d7c8d5f9df5484b3
+        url: https://github.com/rhoai-rhtap/opendatahub-operator
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3
+    name: codeflare-ci-operator
+    source:
+      git:
+        dockerfileUrl: Dockerfile
+        revision: c09ac18a3ba1fb3ae1530157882e523831dc9d8a
+        url: https://github.com/rhoai-rhtap/codeflare-operator
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:61cd98449cbd432c6301305b38e6986618147b78e9c67fc5165aec8244521c2f
+    name: feast-operator-poc
+    source:
+      git:
+        context: infra/feast-operator
+        dockerfileUrl: Dockerfile
+        revision: 2cfe6c85c0091410308a7f2c7d948a3e4d1817db
+        url: https://github.com/rhoai-rhtap/feast
+  - containerImage: quay.io/opendatahub/opendatahub-operator@sha256:5a040367eeb6f8e3d47563f6f65b35edcc93a2694029e4d758ce49f45437f734
+    name: odh-ci-operator
+    source:
+      git:
+        dockerfileUrl: Dockerfiles/Dockerfile
+        revision: a0778e5a9f1ec5073bbd7811d68aa3a91050b7cc
+        url: https://github.com/opendatahub-io/opendatahub-operator
+  - containerImage: quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8
+    name: odh-ci-operator-bundle
+    source:
+      git:
+        dockerfileUrl: bundle/Dockerfile
+        revision: 9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3
+        url: https://github.com/opendatahub-io/ODH-Build-Config
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834
+    name: component-1
+    source:
+      git:
+        dockerfileUrl: Dockerfile
+        revision: 140e8758527e0a55552e98588555259ccd375ba4
+        url: https://github.com/opendatahub-io/ODH-Build-Config
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d
+    name: component-2
+    source:
+      git:
+        dockerfileUrl: Dockerfile
+        revision: 1b0ef05360ce713fa71ba4f70c867864f1dc2e54
+        url: https://github.com/opendatahub-io/ODH-Build-Config
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:c6ee724138ba2ea4bf7b7cfa6fbbfc7f992f2fa2ec1c9c431abaa01727fe04c9
+    name: feature-server-poc
+    source:
+      git:
+        revision: 03f89001716cf7c1a01a9602bc5ff21073a8a9a9
+        url: https://github.com/rhoai-rhtap/feast
+  - containerImage: quay.io/redhat-user-workloads/open-data-hub-tenant/feast@sha256:c6ee724138ba2ea4bf7b7cfa6fbbfc7f992f2fa2ec1c9c431abaa01727fe04c6
+    name: feast
+    source:
+      git:
+        revision: 03f89001716cf7c1a01a9602bc5ff21073a8a9a5
+        url: https://github.com/rhoai-rhtap/feast
