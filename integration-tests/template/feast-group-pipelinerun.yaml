@@ -1,0 +1,16 @@
+---
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: odh-group-test-feast
+  namespace: open-data-hub-tenant
+spec:
+  pipelineRef:
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/opendatahub-io/odh-konflux-central.git
+    - name: revision
+      value: konflux-poc
+    - name: pathInRepo
+      value: integration-tests/template/pr-group-testing-pipeline.yaml

@@ -1,0 +1,18 @@
+[
+  {
+    "namespace": "open-data-hub-tenant",
+    "component": "feature-server-poc",
+    "buildPipelineRun": "feature-server-poc-on-pull-request-b29mr",
+    "snapshot": "poc-6g7j5",
+    "repoUrl": "https://github.com/rhoai-rhtap/feast",
+    "pullRequestNumber": "3"
+  },
+  {
+    "namespace": "open-data-hub-tenant",
+    "component": "feast-operator-poc",
+    "buildPipelineRun": "feast-operator-poc-on-pull-request-bvpcd",
+    "snapshot": "poc-lzpgp",
+    "repoUrl": "https://github.com/rhoai-rhtap/feast",
+    "pullRequestNumber": "3"
+  }
+]

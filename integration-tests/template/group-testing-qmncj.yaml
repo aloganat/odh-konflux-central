@@ -1,0 +1,335 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    pac.test.appstudio.openshift.io/log-url: https://konflux-ui.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/ns/open-data-hub-tenant/pipelinerun/group-testing-qmncj
+    test.appstudio.openshift.io/group-test-info: '[{"namespace":"open-data-hub-tenant","component":"feature-server-poc","buildPipelineRun":"feature-server-poc-on-pull-request-b29mr","snapshot":"poc-6g7j5","repoUrl":"https://github.com/rhoai-rhtap/feast","pullRequestNumber":"3"},{"namespace":"open-data-hub-tenant","component":"feast-operator-poc","buildPipelineRun":"feast-operator-poc-on-pull-request-bvpcd","snapshot":"poc-lzpgp","repoUrl":"https://github.com/rhoai-rhtap/feast","pullRequestNumber":"3"}]'
+    test.appstudio.openshift.io/pr-group: poc
+    test.appstudio.openshift.io/status: '[{"scenario":"group-testing","status":"Pending","lastUpdateTime":"2026-01-20T10:26:00.308061838Z","details":"Pending"}]'
+  creationTimestamp: "2026-01-20T10:26:00Z"
+  finalizers:
+  - test.appstudio.openshift.io/pipelinerun
+  - results.tekton.dev/pipelinerun
+  - chains.tekton.dev/pipelinerun
+  generateName: group-testing-
+  generation: 2
+  labels:
+    appstudio.openshift.io/application: poc
+    appstudio.openshift.io/snapshot: poc-wx8s7
+    kueue.x-k8s.io/priority-class: konflux-default
+    kueue.x-k8s.io/queue-name: pipelines-queue
+    pac.test.appstudio.openshift.io/event-type: on-comment
+    pipelines.appstudio.openshift.io/type: test
+    tekton.dev/pipeline: odh-pr-test
+    test.appstudio.openshift.io/pr-group-sha: 18889a721a537ee1d9f6de4268a9ccf9f3e59bfebac6441f393996fa66ac80
+    test.appstudio.openshift.io/scenario: group-testing
+    test.appstudio.openshift.io/type: group
+  name: group-testing-qmncj
+  namespace: open-data-hub-tenant
+  ownerReferences:
+  - apiVersion: appstudio.redhat.com/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Snapshot
+    name: poc-wx8s7
+    uid: b3e7b770-5606-4aec-87c9-be33a0447a3f
+  resourceVersion: "6772351547"
+  uid: 0be4f9e6-25f9-4372-a795-02b912d0dd2e
+spec:
+  params:
+  - name: SNAPSHOT
+    value: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
+  pipelineRef:
+    params:
+    - name: url
+      value: https://github.com/opendatahub-io/odh-konflux-central.git
+    - name: revision
+      value: konflux-poc
+    - name: pathInRepo
+      value: integration-tests/template/pr-group-testing-pipeline.yaml
+    resolver: git
+  taskRunTemplate:
+    podTemplate:
+      nodeSelector:
+        konflux-ci.dev/workload: konflux-tenants
+      tolerations:
+      - effect: NoSchedule
+        key: konflux-ci.dev/workload
+        operator: Equal
+        value: konflux-tenants
+    serviceAccountName: konflux-integration-runner
+  timeouts:
+    finally: 2h0m0s
+    pipeline: 6h0m0s
+    tasks: 4h0m0s
+status:
+  childReferences:
+  - apiVersion: tekton.dev/v1
+    kind: TaskRun
+    name: group-testing-qmncj-parse-metadata
+    pipelineTaskName: parse-metadata
+  - apiVersion: tekton.dev/v1
+    kind: TaskRun
+    name: group-testing-qmncj-test-snapshot-component
+    pipelineTaskName: test-snapshot-component
+  - apiVersion: tekton.dev/v1
+    kind: TaskRun
+    name: group-testing-qmncj-provision-eaas-space
+    pipelineTaskName: provision-eaas-space
+  - apiVersion: tekton.dev/v1
+    kind: TaskRun
+    name: group-testing-qmncj-provision-cluster
+    pipelineTaskName: provision-cluster
+  conditions:
+  - lastTransitionTime: "2026-01-20T10:26:22Z"
+    message: 'Tasks Completed: 3 (Failed: 0, Cancelled 0), Incomplete: 2, Skipped:
+      0'
+    reason: Running
+    status: Unknown
+    type: Succeeded
+  pipelineSpec:
+    description: "An integration test which provisions an ephemeral Hypershift cluster,
+      deploys opendatahub-operator \nfrom a Konflux snapshot and runs the e2e tests
+      against it.\n"
+    params:
+    - description: Snapshot of the application
+      name: SNAPSHOT
+      type: string
+    tasks:
+    - name: parse-metadata
+      params:
+      - name: SNAPSHOT
+        value: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
+      taskRef:
+        params:
+        - name: url
+          value: https://github.com/konflux-ci/integration-examples
+        - name: revision
+          value: main
+        - name: pathInRepo
+          value: tasks/test_metadata.yaml
+        resolver: git
+    - description: Placeholder task that prints the Snapshot and outputs standard
+        TEST_OUTPUT
+      name: test-snapshot-component
+      params:
+      - name: SNAPSHOT
+        value: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
+      runAfter:
+      - parse-metadata
+      taskSpec:
+        metadata: {}
+        params:
+        - description: The JSON string of the Snapshot under test
+          name: SNAPSHOT
+          type: string
+        spec: null
+        steps:
+        - computeResources: {}
+          env:
+          - name: SNAPSHOT
+            value: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
+          - name: SNAPSHOT_URL
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-repo-url']
+          - name: SNAPSHOT_SHA
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/sha']
+          image: quay.io/konflux-ci/konflux-test:stable
+          name: test-snapshot-component
+          script: |
+            #!/bin/bash
+            set -e
+            echo "SNAPSHOT_URL=${SNAPSHOT_URL}"
+            echo "SNAPSHOT_SHA=${SNAPSHOT_SHA}"
+
+            components=$(jq -c '.components[]' <<< "${SNAPSHOT}")
+            snapshotUrlUrlWithoutSuffix=$(echo $SNAPSHOT_URL | sed 's/\.git$//')
+            echo "snapshotUrlUrlWithoutSuffix=${snapshotUrlUrlWithoutSuffix}"
+
+            while read components
+            do
+              componentUrl=$(echo "$components" | jq -r '.source.git.url')
+              echo "componentUrl=${componentUrl}"
+
+              componentUrlWithoutSuffix=$(echo $componentUrl | sed 's/\.git$//')
+              echo "componentUrlWithoutSuffix=${componentUrlWithoutSuffix}"
+
+              name=$(echo "$components" | jq -r '.name')
+              echo "name=${name}"
+
+              componentSha=$(echo "$components" | jq -r '.source.git.revision')
+              echo "componentSha=${componentSha}"
+
+                # Check if component git url equals to snapshot git url, if yes check if the snapshot SHA equals to component SHA
+                if [[ $componentUrlWithoutSuffix == $snapshotUrlUrlWithoutSuffix ]]; then
+                    if [[ $componentSha != $SNAPSHOT_SHA ]]; then
+                    echo "FAIL: Component $name has different SHA: $componentSha than the snapshot, SHA: $SNAPSHOT_SHA."
+                    exit 1
+                    fi
+                fi
+              echo "SUCCESS: Component $name matches snapshot SHA."
+            done < <(echo "$components")
+          workingDir: /workspace
+    - name: provision-eaas-space
+      params:
+      - name: ownerName
+        value: group-testing-qmncj
+      - name: ownerUid
+        value: 0be4f9e6-25f9-4372-a795-02b912d0dd2e
+      runAfter:
+      - test-snapshot-component
+      taskRef:
+        params:
+        - name: url
+          value: https://github.com/konflux-ci/build-definitions.git
+        - name: revision
+          value: main
+        - name: pathInRepo
+          value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
+        resolver: git
+    - name: provision-cluster
+      runAfter:
+      - provision-eaas-space
+      taskSpec:
+        metadata: {}
+        results:
+        - name: clusterName
+          type: string
+          value: $(steps.create-cluster.results.clusterName)
+        spec: null
+        steps:
+        - computeResources: {}
+          name: get-supported-versions
+          params:
+          - name: eaasSpaceSecretRef
+            value: $(tasks.provision-eaas-space.results.secretRef)
+          ref:
+            params:
+            - name: url
+              value: https://github.com/konflux-ci/build-definitions.git
+            - name: revision
+              value: main
+            - name: pathInRepo
+              value: stepactions/eaas-get-supported-ephemeral-cluster-versions/0.1/eaas-get-supported-ephemeral-cluster-versions.yaml
+            resolver: git
+        - computeResources: {}
+          name: pick-version
+          params:
+          - name: prefix
+            value: $(steps.get-supported-versions.results.versions[0]).
+          ref:
+            params:
+            - name: url
+              value: https://github.com/konflux-ci/build-definitions.git
+            - name: revision
+              value: main
+            - name: pathInRepo
+              value: stepactions/eaas-get-latest-openshift-version-by-prefix/0.1/eaas-get-latest-openshift-version-by-prefix.yaml
+            resolver: git
+        - computeResources: {}
+          name: create-cluster
+          params:
+          - name: eaasSpaceSecretRef
+            value: $(tasks.provision-eaas-space.results.secretRef)
+          - name: version
+            value: $(steps.pick-version.results.version)
+          - name: instanceType
+            value: m5.2xlarge
+          ref:
+            params:
+            - name: url
+              value: https://github.com/konflux-ci/build-definitions.git
+            - name: revision
+              value: main
+            - name: pathInRepo
+              value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
+            resolver: git
+    - name: deploy-and-test
+      params:
+      - name: git-url
+        value: $(tasks.parse-metadata.results.source-git-url)
+      - name: git-rev
+        value: $(tasks.parse-metadata.results.target-git-branch)
+      - name: component-image
+        value: $(tasks.parse-metadata.results.component-container-image)
+      - name: SNAPSHOT
+        value: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
+      runAfter:
+      - provision-cluster
+      taskSpec:
+        metadata: {}
+        params:
+        - name: SNAPSHOT
+          type: string
+        spec: null
+        steps:
+        - computeResources: {}
+          name: get-kubeconfig
+          params:
+          - name: eaasSpaceSecretRef
+            value: $(tasks.provision-eaas-space.results.secretRef)
+          - name: clusterName
+            value: $(tasks.provision-cluster.results.clusterName)
+          - name: credentials
+            value: credentials
+          ref:
+            params:
+            - name: url
+              value: https://github.com/konflux-ci/build-definitions.git
+            - name: revision
+              value: main
+            - name: pathInRepo
+              value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            resolver: git
+        - computeResources: {}
+          env:
+          - name: KUBECONFIG
+            value: /credentials/$(steps.get-kubeconfig.results.kubeconfig)
+          - name: SNAPSHOT
+            value: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
+          image: quay.io/rhoai/rhoai-task-toolset:its
+          name: deploy-and-e2e
+          script: |-
+            oc get pods
+            oc whoami
+
+            COMPONENT_NAME=feast-operator-poc
+            FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .containerImage' <<< "${SNAPSHOT}")
+            echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+
+            COMPONENT_NAME=feature-server-poc
+            FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .containerImage' <<< "${SNAPSHOT}")
+            echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
+
+            REPO_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .source.git.url' <<< "${SNAPSHOT}")
+            REVISION=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .source.git.revision' <<< "${SNAPSHOT}")
+            echo "REPO_URL=${REPO_URL}"
+            echo "REVISION=${REVISION}"
+            git clone "${REPO_URL}" src_code
+            cd src_code
+            git checkout ${REVISION}
+
+            # export RUN_ON_OPENSHIFT_CI=true
+            # cd infra/feast-operator
+            # make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+            # oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
+            # make test-e2e
+            # make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+
+            # make test-previous-version
+            # oc delete deployment feast-operator-controller-manager -n feast-operator-system
+
+            # make test-upgrade
+          volumeMounts:
+          - mountPath: /credentials
+            name: credentials
+          workingDir: /workspace/source
+        volumes:
+        - emptyDir: {}
+          name: credentials
+  spanContext:
+    traceparent: 00-6716739eb43b34f2a95519bfa1c7023f-8bd80a82644933e1-01
+  startTime: "2026-01-20T10:26:00Z"

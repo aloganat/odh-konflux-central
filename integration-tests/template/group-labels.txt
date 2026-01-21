@@ -1,0 +1,10 @@
+appstudio.openshift.io/application=poc
+appstudio.openshift.io/snapshot=poc-wx8s7
+kueue.x-k8s.io/priority-class=konflux-default
+kueue.x-k8s.io/queue-name=pipelines-queue
+pac.test.appstudio.openshift.io/event-type=on-comment
+pipelines.appstudio.openshift.io/type=test
+tekton.dev/pipeline=odh-pr-test
+test.appstudio.openshift.io/pr-group-sha=18889a721a537ee1d9f6de4268a9ccf9f3e59bfebac6441f393996fa66ac80
+test.appstudio.openshift.io/scenario=group-testing
+test.appstudio.openshift.io/type=group
