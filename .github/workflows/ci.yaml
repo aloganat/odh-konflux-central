@@ -1,0 +1,111 @@
+name: ODH Konflux PipelineRuns Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Repository name'
+        required: true
+        type: choice
+        options:
+          - caikit-nlp
+          - caikit-tgis-serving
+          - kuberay
+          # Add all valid components here
+
+      release_branch:
+        description: 'Target Release Branch'
+        required: true
+        type: string
+
+jobs:
+  sync-pipelineruns-and-create-pr:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout OKC repository
+        uses: actions/checkout@v4
+        with:
+          path: okc-repo
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: getsentry/action-github-app-token@v2
+        with:
+          app_id: ${{ secrets.ODH_DEVOPS_APP_ID }}
+          private_key: ${{ secrets.ODH_DEVOPS_APP_PRIVATE_KEY }}
+
+      - name: Set environment variables
+        run: |
+          echo "REPOSITORY=opendatahub-io/${{ inputs.component }}" >> $GITHUB_ENV
+          echo "OKC_FOLDER=${{ inputs.component }}" >> $GITHUB_ENV
+
+      - name: Prepare PipelineRun files (no modifications)
+        run: |
+          repo_folder="okc-repo/pipelineruns/${OKC_FOLDER}"
+          echo "Using PipelineRuns path: $repo_folder"
+
+          if [ ! -d "$repo_folder" ]; then
+            echo "ERROR: $repo_folder does not exist!"
+            exit 1
+          fi
+
+          mkdir -p extracted/.tekton
+          find "$repo_folder" -type f -name "*.yaml" -exec cp {} extracted/.tekton/ \;
+
+          if [ -z "$(ls -A extracted/.tekton)" ]; then
+            echo "ERROR: No PipelineRun YAMLs found in $repo_folder"
+            exit 1
+          fi
+
+          echo "PipelineRuns copied without any modification"
+
+      - name: Clone component repo and push changes
+        run: |
+          git clone https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${REPOSITORY} repo-workspace
+          cd repo-workspace
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin ${{ inputs.release_branch }}
+          git checkout -B ${{ inputs.release_branch }} origin/${{ inputs.release_branch }}
+
+          branch_name="appstudio-${{ inputs.component }}-pipelineruns-sync-$(date +%s)"
+          echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
+
+          git checkout -B "$branch_name" ${{ inputs.release_branch }}
+
+          mkdir -p .tekton
+          rsync -av --delete ../extracted/.tekton/ .tekton/
+          git add -f .tekton
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            echo "commit=false" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          git commit -m "Sync PipelineRuns from OKC"
+          git push --set-upstream origin "$branch_name"
+          echo "commit=true" >> $GITHUB_ENV
+
+      - name: Create Pull Request
+        if: env.commit == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh pr create \
+            --repo "${REPOSITORY}" \
+            --base "${{ inputs.release_branch }}" \
+            --head "${BRANCH_NAME}" \
+            --title "Sync PipelineRuns from OKC" \
+            --body "This PR syncs PipelineRun definitions from the OKC repository into \`.tekton/\`.
+
+          - No substitutions applied
+          - Files copied as-is
+          - Target branch: \`${{ inputs.release_branch }}\`"
