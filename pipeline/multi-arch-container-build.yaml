@@ -117,6 +117,10 @@ spec:
     type: string
     default: push
     description: Type of pipeline execution (push)
+  - name: enable-group-testing
+    default: "false"
+    type: string
+    description: Triggers a group testing pipeline at the end of PR builds
   results:
   - description: ""
     name: IMAGE_URL
@@ -740,6 +744,28 @@ spec:
       operator: in
       values:
         - "push"
+  - name: trigger-group-testing
+    workspaces:
+    - name: basic-auth
+      workspace: git-auth
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks.git
+      - name: revision
+        value: odh
+      - name: pathInRepo
+        value: konflux-tekton-tasks/trigger-group-testing/0.1/trigger-group-testing.yaml
+    when:
+    - input: $(tasks.pipeline-success-indicator.status)
+      operator: in
+      values:
+      - "Succeeded"
+    - input: $(params.enable-group-testing)
+      operator: in
+      values:
+      - "true"
   workspaces:
   - name: git-auth
     optional: true
