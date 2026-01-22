@@ -110,10 +110,6 @@ spec:
                   fi
                 echo "SUCCESS: Component $name matches snapshot SHA."
               done < <(echo "$components")
-              
-
-            securityContext:
-              runAsUser: 0
 #    - name: provision-eaas-space
 #      runAfter:
 #        - test-snapshot-component
