@@ -5,7 +5,7 @@ metadata:
   name: opendatahub-operator-e2e-test
 spec:
   description: |
-    An integration test which provisions an ephemeral Hypershift cluster, deploys opendatahub-operator 
+    An integration test which provisions an ephemeral Hypershift cluster, deploys opendatahub-operator
     from a Konflux snapshot and runs the e2e tests against it.
   params:
     - description: Snapshot of the application

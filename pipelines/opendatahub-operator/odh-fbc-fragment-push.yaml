@@ -508,16 +508,16 @@ spec:
                 fieldPath: metadata.annotations['pipelinesascode.tekton.dev/sha']
           script: |
             echo "pipelinerun-name = $pipelinerun_name"
-  
+
             application_name=${target_branch/rhoai-/}
             application_name=rhoai-v${application_name/./-}
             echo "application-name = $application_name"
             echo "image url = $image_url"
             echo "image digest = $image_digest"
-  
+
             component_name=${pipelinerun_name/-on-*/}
             echo "component-name = $component_name"
-  
+
             build_time="$(date +%Y-%m-%dT%H:%M:%S)"
             alertEmoji=":solid-success:"
             slack_message="${alertEmoji} A new CI build is available for ${target_branch}: ${build_time}"
@@ -526,7 +526,7 @@ spec:
             slack_message=$(echo -e "${slack_message}\nImage: ${image_url}@${image_digest}")
             slack_message=$(echo -e "${slack_message}\nCommit: <${COMMIT_URL}|${COMMIT_SHORT}>")
             slack_message=$(echo -e "${slack_message}\nBuild: <${BUILD_URL}|${pipelinerun_name}>")
-  
+
             echo -n "${slack_message}" > "$(results.slack-message-sucess-text.path)"
       runAfter:
       - build-image-index
