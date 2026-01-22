@@ -66,19 +66,6 @@ spec:
             script: |
               #!/bin/bash
               set -e
-              if [ "${WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND}" = "true" ]; then
-                echo "configuring gh cli"
-                ls -la "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}"
-                GH_TOKEN=$(cat "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/git-provider-token")
-                echo "read the token"
-                # echo ${token} | gh auth login --with-token
-                PR_SHA=$(curl -s \
-                        -H "Authorization: Bearer $GH_TOKEN" \
-                        -H "Accept: application/vnd.github+json" \
-                        https://api.github.com/repos/rhoai-rhtap/feast/pulls/3 \
-                        | jq -r '.head.sha')
-                curl -s   -H "Authorization: Bearer $GH_TOKEN"   -H "Accept: application/vnd.github+json"   "https://api.github.com/repos/rhoai-rhtap/feast/commits/$PR_SHA/check-runs"  | jq '.check_runs[] | {name, status}'
-              fi
               
               echo "SNAPSHOT_URL=${SNAPSHOT_URL}"
               echo "SNAPSHOT_SHA=${SNAPSHOT_SHA}"
