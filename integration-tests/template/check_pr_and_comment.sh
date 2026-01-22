@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Script to check PR check runs and add a comment if conditions are met
+# Usage: ./check_pr_and_comment.sh <owner> <repo> <pr_number> <github_token>
+
+set -e
+
+# Check arguments
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <owner> <repo> <pr_number> <github_token>"
+    echo "Example: $0 opendatahub-io odh-dashboard 123 ghp_xxx"
+    exit 1
+fi
+
+OWNER="$1"
+REPO="$2"
+PR_NUMBER="$3"
+GITHUB_TOKEN="$4"
+
+API_BASE="https://api.github.com"
+
+echo "Fetching PR details for PR #$PR_NUMBER..."
+
+# Get PR details to extract the head SHA
+PR_DATA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" \
+    "$API_BASE/repos/$OWNER/$REPO/pulls/$PR_NUMBER")
+
+HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head.sha')
+
+if [ -z "$HEAD_SHA" ] || [ "$HEAD_SHA" = "null" ]; then
+    echo "Error: Could not fetch PR head SHA"
+    exit 1
+fi
+
+echo "Head SHA: $HEAD_SHA"
+echo "Fetching check runs for commit..."
+
+# Get all check runs for the commit
+CHECK_RUNS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" \
+    "$API_BASE/repos/$OWNER/$REPO/commits/$HEAD_SHA/check-runs")
+
+# Extract check run names and statuses
+CHECK_COUNT=$(echo "$CHECK_RUNS" | jq '.check_runs | length')
+
+if [ "$CHECK_COUNT" -eq 0 ]; then
+    echo "No check runs found for this PR"
+    exit 0
+fi
+
+echo "Found $CHECK_COUNT check runs"
+
+# Initialize counters
+COMPLETED_COUNT=0
+ODH_GROUP_TEST_COUNT=0
+ODH_GROUP_TEST_COMPLETED=0
+TOTAL_COUNT=0
+
+# Parse each check run
+while IFS=$'\t' read -r name status; do
+    TOTAL_COUNT=$((TOTAL_COUNT + 1))
+    echo "Check: $name - Status: $status"
+
+    if [ "$status" = "completed" ]; then
+        COMPLETED_COUNT=$((COMPLETED_COUNT + 1))
+
+        # Check if this is the odh-group-test check
+        if [[ "$name" == *"odh-group-test"* ]]; then
+            ODH_GROUP_TEST_COMPLETED=$((ODH_GROUP_TEST_COMPLETED + 1))
+        fi
+    fi
+
+    # Count odh-group-test checks
+    if [[ "$name" == *"odh-group-test"* ]]; then
+        ODH_GROUP_TEST_COUNT=$((ODH_GROUP_TEST_COUNT + 1))
+    fi
+done < <(echo "$CHECK_RUNS" | jq -r '.check_runs[] | [.name, .status] | @tsv')
+
+echo ""
+echo "Summary:"
+echo "- Total checks: $TOTAL_COUNT"
+echo "- Completed checks: $COMPLETED_COUNT"
+echo "- odh-group-test checks: $ODH_GROUP_TEST_COUNT"
+echo "- odh-group-test completed: $ODH_GROUP_TEST_COMPLETED"
+
+# Check if condition is met:
+# All checks are completed except exactly one odh-group-test check
+NON_ODH_CHECKS=$((TOTAL_COUNT - ODH_GROUP_TEST_COUNT))
+EXPECTED_COMPLETED=$((NON_ODH_CHECKS + ODH_GROUP_TEST_COMPLETED))
+
+if [ "$ODH_GROUP_TEST_COUNT" -eq 1 ] && \
+   [ "$ODH_GROUP_TEST_COMPLETED" -eq 0 ] && \
+   [ "$COMPLETED_COUNT" -eq "$EXPECTED_COMPLETED" ] && \
+   [ "$EXPECTED_COMPLETED" -eq $((TOTAL_COUNT - 1)) ]; then
+
+    echo ""
+    echo "✓ Condition met: All checks completed except odh-group-test"
+    echo "Adding comment '/group-test' to PR #$PR_NUMBER..."
+
+    # Add comment to PR
+    COMMENT_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+        "$API_BASE/repos/$OWNER/$REPO/issues/$PR_NUMBER/comments" \
+        -d '{"body":"/group-test"}')
+
+    COMMENT_URL=$(echo "$COMMENT_RESPONSE" | jq -r '.html_url')
+
+    if [ -n "$COMMENT_URL" ] && [ "$COMMENT_URL" != "null" ]; then
+        echo "✓ Comment added successfully: $COMMENT_URL"
+    else
+        echo "✗ Failed to add comment"
+        echo "$COMMENT_RESPONSE" | jq .
+        exit 1
+    fi
+else
+    echo ""
+    echo "✗ Condition not met. Not adding comment."
+    echo "Reason: Need all checks completed except exactly one 'odh-group-test' check that is not completed"
+fi
