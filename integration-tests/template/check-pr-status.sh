@@ -7,7 +7,7 @@ GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 REPO_OWNER="${REPO_OWNER:-}"
 REPO_NAME="${REPO_NAME:-}"
 PR_NUMBER="${PR_NUMBER:-}"
-
+CURRENT_PR_NAME="${CURRENT_PR_NAME:-}"
 # Usage message
 usage() {
     echo "Usage: $0"
@@ -68,8 +68,8 @@ echo "$KONFLUX_CHECKS"
 ALL_COMPLETED=true
 while IFS='|' read -r name status; do
     # Skip the check with "odh-group-test" in its name
-    if [[ "$name" == *"odh-group-test"* ]]; then
-        echo "Skipping check: $name (contains odh-group-test)"
+    if [[ "$name" == *"odh-group-test"* || "$name" == *"${CURRENT_PR_NAME}" ]]; then
+        echo "Skipping check: $name (contains odh-group-test or it is the current pipeline which is about to finish!)"
         continue
     fi
 

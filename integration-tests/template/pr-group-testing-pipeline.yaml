@@ -8,57 +8,55 @@ spec:
     An integration test which provisions an ephemeral Hypershift cluster, deploys opendatahub-operator 
     from a Konflux snapshot and runs the e2e tests against it.
   params:
-    - description: Snapshot of the application
-      name: SNAPSHOT
+#    - description: Snapshot of the application
+#      name: SNAPSHOT
+#      type: string
+#      default: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
+    - description: List of components in the group
+      name: group-components
       type: string
-      default: '{"application":"poc","components":[{"name":"component-1","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-1@sha256:345950208022855fe4a5bd05051b2497fe0126f2126ff30fb2ebe1a5b3915834","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"140e8758527e0a55552e98588555259ccd375ba4","dockerfileUrl":"Dockerfile"}}},{"name":"component-2","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/component-2@sha256:e9e631f92eaf2dcab0c70739c38ce2e649319efd8c74dc28bdda63c33200a68d","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"1b0ef05360ce713fa71ba4f70c867864f1dc2e54","dockerfileUrl":"Dockerfile"}}},{"name":"feature-server-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feature-server-poc@sha256:095c2df5557f472d436efe44a0fd2f1b5f51a086a6a52653b7c914e4a884e3fc","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-fbc-fragment","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/odh-ci-fbc-fragment@sha256:d57d76291a936b96420e235f53337cbd875a9153e328c1a0236330f5bfc2e133","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"8d4c702d06496795dbd5a56df9814a843ccd4da0","context":"catalog/v4.20","dockerfileUrl":"Dockerfile"}}},{"name":"odh-ci-operator-rhoai-rhtap","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:479a48b0d5d6331c8f4558bf76d5829fc3b6b17deb078b8ffac2df55d7c120ca","source":{"git":{"url":"https://github.com/rhoai-rhtap/opendatahub-operator","revision":"5e2fc88635ddc709dfa2a29452cd1cc43c97a74a","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"codeflare-ci-operator","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/codeflare-ci-operator@sha256:446517c4823df70c4f52a0dac74938bd6e168efa58185aef4cea1c90ba5d85d3","source":{"git":{"url":"https://github.com/rhoai-rhtap/codeflare-operator","revision":"c09ac18a3ba1fb3ae1530157882e523831dc9d8a","dockerfileUrl":"Dockerfile"}}},{"name":"feast-operator-poc","containerImage":"quay.io/redhat-user-workloads/open-data-hub-tenant/feast-operator-poc@sha256:3f7830846eaf3b775890e8ab1efd1ed1438af9715bf2ef9d26c8c15df4638425","source":{"git":{"url":"https://github.com/rhoai-rhtap/feast","revision":"662d8fc2ef3fa7ab2e8d24c586989225bdcbbaab"}}},{"name":"odh-ci-operator","containerImage":"quay.io/opendatahub/opendatahub-operator@sha256:3344e727d42271665bfef30891d7cefee2647c8ee36935f191c4fabd6af68bbc","source":{"git":{"url":"https://github.com/opendatahub-io/opendatahub-operator","revision":"f260c24129d62a83ab29ffbf6f86e64add695c72","dockerfileUrl":"Dockerfiles/Dockerfile"}}},{"name":"odh-ci-operator-bundle","containerImage":"quay.io/opendatahub/opendatahub-operator-bundle@sha256:1ad8af30fa90111d830c9c975733ac0aad03473c2c274f69fd093897c697a1b8","source":{"git":{"url":"https://github.com/opendatahub-io/ODH-Build-Config","revision":"9fbc18d7bfeff75c6f7eab87cd329cf1c262fac3","dockerfileUrl":"bundle/Dockerfile"}}}],"artifacts":{}}'
   #test
   tasks:
-    - name: parse-metadata
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-ci/integration-examples
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: tasks/test_metadata.yaml
-      params:
-        - name: SNAPSHOT
-          value: $(params.SNAPSHOT)
-    - name: test-snapshot-component
+#    - name: parse-metadata
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: https://github.com/konflux-ci/integration-examples
+#          - name: revision
+#            value: main
+#          - name: pathInRepo
+#            value: tasks/test_metadata.yaml
+#      params:
+#        - name: SNAPSHOT
+#          value: $(params.SNAPSHOT)
+    - name: generate-snapshot
       description: Placeholder task that prints the Snapshot and outputs standard TEST_OUTPUT
-      runAfter:
-        - parse-metadata
+#      runAfter:
+#        - parse-metadata
       params:
-        - name: SNAPSHOT
-          value: $(params.SNAPSHOT)
+        - name: COMPONENTS
+          value: $(params.group-components)
       workspaces:
       - name: basic-auth
         workspace: git-auth
       taskSpec:
         params:
-          - name: SNAPSHOT
-            description: The JSON string of the Snapshot under test
+          - name: COMPONENTS
+            description: List of components in the group
+        results:
+        - description: Snapshot json string
+          name: SNAPSHOT
         workspaces:
           - name: basic-auth
             optional: true
         steps:
-          - name: test-snapshot-component
+          - name: generate-snapshot
             image: quay.io/konflux-ci/konflux-test:stable
             workingDir: /workspace
             env:
-              - name: SNAPSHOT
-                value: $(params.SNAPSHOT)
-              - name: SNAPSHOT_URL
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-repo-url']
-              - name: SNAPSHOT_SHA
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/sha']
+              - name: COMPONENTS
+                value: $(params.COMPONENTS)
               - name: WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND
                 value: $(workspaces.basic-auth.bound)
               - name: WORKSPACE_BASIC_AUTH_DIRECTORY_PATH
@@ -66,37 +64,64 @@ spec:
             script: |
               #!/bin/bash
               set -e
+              json_string='$COMPONENTS'
               
-              echo "SNAPSHOT_URL=${SNAPSHOT_URL}"
-              echo "SNAPSHOT_SHA=${SNAPSHOT_SHA}"
+              # Tag to search for
+              TAG="odh-pr"
               
-              components=$(jq -c '.components[]' <<< "${SNAPSHOT}")
-              snapshotUrlUrlWithoutSuffix=$(echo $SNAPSHOT_URL | sed 's/\.git$//')
-              echo "snapshotUrlUrlWithoutSuffix=${snapshotUrlUrlWithoutSuffix}"
+              # Temporary file to store results
+              temp_file=$(mktemp)
+              echo "{}" > "$temp_file"
               
-              while read components
-              do
-                componentUrl=$(echo "$components" | jq -r '.source.git.url')
-                echo "componentUrl=${componentUrl}"
+              # Parse JSON and iterate through each component
+              while IFS= read -r row; do
+                  # Decode the base64 encoded row
+                  component=$(echo "$row" | base64 -d | jq -r '.key')
+                  repo_path=$(echo "$row" | base64 -d | jq -r '.value')
               
-                componentUrlWithoutSuffix=$(echo $componentUrl | sed 's/\.git$//')
-                echo "componentUrlWithoutSuffix=${componentUrlWithoutSuffix}"
+                  # Construct full quay URL
+                  full_repo="quay.io/${repo_path}"
               
-                name=$(echo "$components" | jq -r '.name')
-                echo "name=${name}"
+                  echo "Processing component: $component" >&2
+                  echo "Repository: $full_repo" >&2
               
-                componentSha=$(echo "$components" | jq -r '.source.git.revision')
-                echo "componentSha=${componentSha}"
+                  # Extract namespace and repository name from repo_path
+                  # Format: namespace/project/repository
+                  namespace=$(echo "$repo_path" | cut -d'/' -f1-2)
+                  repository=$(echo "$repo_path" | cut -d'/' -f3)
               
-                  # Check if component git url equals to snapshot git url, if yes check if the snapshot SHA equals to component SHA
-                  if [[ $componentUrlWithoutSuffix == $snapshotUrlUrlWithoutSuffix ]]; then
-                      if [[ $componentSha != $SNAPSHOT_SHA ]]; then
-                      echo "FAIL: Component $name has different SHA: $componentSha than the snapshot, SHA: $SNAPSHOT_SHA."
-                      exit 1
-                      fi
+                  # Query Quay API to get the digest for the tag
+                  api_url="https://quay.io/api/v1/repository/${namespace}/${repository}/tag/?specificTag=${TAG}"
+              
+                  echo "Querying: $api_url" >&2
+              
+                  # Make API request and extract the manifest digest
+                  response=$(curl -s "$api_url")
+              
+                  # Get the latest (first) tag's manifest digest
+                  manifest_digest=$(echo "$response" | jq -r '.tags[0].manifest_digest // empty')
+              
+                  if [ -z "$manifest_digest" ]; then
+                      echo "Warning: No digest found for $component with tag $TAG" >&2
+                      full_image_uri="${full_repo}:${TAG}"
+                  else
+                      echo "Found digest: $manifest_digest" >&2
+                      full_image_uri="${full_repo}@${manifest_digest}"
                   fi
-                echo "SUCCESS: Component $name matches snapshot SHA."
-              done < <(echo "$components")
+              
+                  # Add to output JSON
+                  jq --arg key "$component" --arg value "$full_image_uri" '. + {($key): $value}' "$temp_file" > "${temp_file}.tmp" && mv "${temp_file}.tmp" "$temp_file"
+              
+                  echo "" >&2
+              done < <(echo "$json_string" | jq -r 'to_entries[] | @base64')
+              
+              # Print final output JSON
+              echo "Output JSON:" >&2
+              cat "$temp_file" | jq '.'
+              echo -en $(cat "$temp_file") > "$(results.SNAPSHOT.path)"
+              # Cleanup
+              rm -f "$temp_file"
+
 #    - name: provision-eaas-space
 #      runAfter:
 #        - test-snapshot-component
