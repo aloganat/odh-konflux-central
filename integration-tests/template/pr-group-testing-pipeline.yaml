@@ -257,3 +257,6 @@ spec:
 #              oc delete deployment feast-operator-controller-manager -n feast-operator-system
 #
 #              make test-upgrade
+  workspaces:
+  - name: git-auth
+    optional: true
