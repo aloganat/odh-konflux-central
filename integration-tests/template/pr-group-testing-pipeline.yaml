@@ -34,10 +34,16 @@ spec:
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
+      workspaces:
+      - name: basic-auth
+        workspace: git-auth
       taskSpec:
         params:
           - name: SNAPSHOT
             description: The JSON string of the Snapshot under test
+        workspaces:
+          - name: basic-auth
+            optional: true
         steps:
           - name: test-snapshot-component
             image: quay.io/konflux-ci/konflux-test:stable
@@ -53,9 +59,18 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/sha']
+              - name: WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND
+                value: $(workspaces.basic-auth.bound)
+              - name: WORKSPACE_BASIC_AUTH_DIRECTORY_PATH
+                value: $(workspaces.basic-auth.path)
             script: |
               #!/bin/bash
               set -e
+              if [ "${WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND}" = "true" ]; then
+                cat "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/git-provider-token" | base64 -d | gh auth login --with-token
+              fi
+              gh pr checks 3 -R rhoai-rhtap/feast --json "name,state"
+              
               echo "SNAPSHOT_URL=${SNAPSHOT_URL}"
               echo "SNAPSHOT_SHA=${SNAPSHOT_SHA}"
               
@@ -86,6 +101,7 @@ spec:
                   fi
                 echo "SUCCESS: Component $name matches snapshot SHA."
               done < <(echo "$components")
+              
 
 #    - name: provision-eaas-space
 #      runAfter:
