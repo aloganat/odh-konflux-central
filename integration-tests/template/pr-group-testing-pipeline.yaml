@@ -67,7 +67,7 @@ spec:
               #!/bin/bash
               set -e
               if [ "${WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND}" = "true" ]; then
-                cat $(readlink "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/git-provider-token") | gh auth login --with-token
+                cat "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/git-provider-token" | gh auth login --with-token
               fi
               gh pr checks 3 -R rhoai-rhtap/feast --json "name,state"
               
