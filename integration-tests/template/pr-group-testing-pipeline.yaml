@@ -46,7 +46,7 @@ spec:
             optional: true
         steps:
           - name: test-snapshot-component
-            image: quay.io/konflux-ci/konflux-test:stable
+            image: quay.io/rhoai/rhoai-task-toolset:go-its
             workingDir: /workspace
             env:
               - name: SNAPSHOT
