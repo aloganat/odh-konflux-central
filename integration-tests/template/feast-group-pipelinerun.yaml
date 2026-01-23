@@ -7,6 +7,9 @@ metadata:
   name: odh-group-test-feast
   namespace: open-data-hub-tenant
 spec:
+  params:
+  - name: group-components
+    value: '{ "feast-operator-poc": "redhat-user-workloads/open-data-hub-tenant/feast-operator-poc", "feature-server-poc": "redhat-user-workloads/open-data-hub-tenant/feature-server-poc" }'
   pipelineRef:
     resolver: git
     params:
