@@ -227,11 +227,7 @@ spec:
         value: "$(tasks.parse-metadata.results.target-git-branch)"
       - name: component-image
         value: "$(tasks.parse-metadata.results.component-container-image)"
-      - name: SNAPSHOT
-        value: $(params.SNAPSHOT)
       taskSpec:
-        params:
-        - name: SNAPSHOT
         volumes:
           - name: credentials
             emptyDir: {}
@@ -259,7 +255,7 @@ spec:
               - name: KUBECONFIG
                 value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
               - name: SNAPSHOT
-                value: $(params.SNAPSHOT)
+                value: $(tasks.generate-snapshot.results.SNAPSHOT)
             workingDir: /workspace/source
             volumeMounts:
               - name: credentials
