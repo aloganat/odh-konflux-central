@@ -64,8 +64,8 @@ spec:
             script: |
               #!/bin/bash
               set -e
-              json_string='$COMPONENTS'
-              
+              json_string="$COMPONENTS"
+              echo ${$COMPONENTS}
               # Tag to search for
               TAG="odh-pr"
               
