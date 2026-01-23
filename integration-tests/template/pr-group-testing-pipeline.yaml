@@ -121,7 +121,26 @@ spec:
               echo -en $(cat "$temp_file") > "$(results.SNAPSHOT.path)"
               # Cleanup
               rm -f "$temp_file"
+    - name: test-snapshot
+      taskSpec:
+        steps:
+          - name: test-snapshot
+            image: quay.io/konflux-ci/konflux-test:stable
+            workingDir: /workspace
+            env:
+              - name: SNAPSHOT
+                value: $(tasks.generate-snapshot.results.SNAPSHOT)
+            script: |
+              #!/bin/bash
+              set -e
+              echo "SNAPSHOT=${SNAPSHOT}"
+              COMPONENT_NAME=feast-operator-poc
+              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]' <<< "${SNAPSHOT}")
+              echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
 
+              COMPONENT_NAME=feature-server-poc
+              FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]' <<< "${SNAPSHOT}")
+              echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
 #    - name: provision-eaas-space
 #      runAfter:
 #        - test-snapshot-component
