@@ -16,6 +16,6 @@ spec:
     - name: url
       value: https://github.com/opendatahub-io/odh-konflux-central.git
     - name: revision
-      value: konflux-poc
+      value: 2d64aecf3f8439542327e17d23ee78fe28d0b27f
     - name: pathInRepo
       value: integration-tests/template/pr-group-testing-pipeline.yaml
