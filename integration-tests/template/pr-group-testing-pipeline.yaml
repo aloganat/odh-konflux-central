@@ -122,6 +122,8 @@ spec:
               # Cleanup
               rm -f "$temp_file"
     - name: test-snapshot
+      runAfter:
+        - generate-snapshot
       taskSpec:
         steps:
           - name: test-snapshot
@@ -143,7 +145,7 @@ spec:
               echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
     - name: provision-eaas-space
       runAfter:
-        - test-snapshot-component
+        - test-snapshot
       taskRef:
         resolver: git
         params:
@@ -220,13 +222,6 @@ spec:
     - name: deploy-and-test
       runAfter:
         - provision-cluster
-      params:
-      - name: git-url
-        value: "$(tasks.parse-metadata.results.source-git-url)"
-      - name: git-rev
-        value: "$(tasks.parse-metadata.results.target-git-branch)"
-      - name: component-image
-        value: "$(tasks.parse-metadata.results.component-container-image)"
       taskSpec:
         volumes:
           - name: credentials
