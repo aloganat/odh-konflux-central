@@ -104,13 +104,65 @@ spec:
                   if [ -z "$manifest_digest" ]; then
                       echo "Warning: No digest found for $component with tag $TAG" >&2
                       full_image_uri="${full_repo}:${TAG}"
+                      git_url=""
+                      git_commit=""
                   else
                       echo "Found digest: $manifest_digest" >&2
                       full_image_uri="${full_repo}@${manifest_digest}"
+              
+                      # Query Quay API to get the manifest details and extract labels
+                      manifest_api_url="https://quay.io/api/v1/repository/${namespace}/${repository}/manifest/${manifest_digest}"
+                      echo "Querying manifest: $manifest_api_url" >&2
+              
+                      manifest_response=$(curl -s "$manifest_api_url")
+                      echo "manifest_response=${manifest_response}" >&2
+              
+                      # Check if this is a manifest list (multi-arch image)
+                      is_manifest_list=$(echo "$manifest_response" | jq -r '.is_manifest_list // false')
+                      echo "Is manifest list: $is_manifest_list" >&2
+              
+                      if [ "$is_manifest_list" = "true" ]; then
+                          echo "Multi-arch image detected, extracting first manifest digest" >&2
+              
+                          # Get the digest of the first manifest in the list
+                          first_manifest_digest=$(echo "$manifest_response" | jq -r '.manifest_data' | jq -r '.manifests[0].digest // empty')
+              
+                          if [ -z "$first_manifest_digest" ]; then
+                              echo "Warning: No manifest found in manifest list" >&2
+                              git_url=""
+                              git_commit=""
+                          else
+                              echo "First manifest digest: $first_manifest_digest" >&2
+              
+                              # Query API again with the specific manifest digest
+                              specific_manifest_api_url="https://quay.io/api/v1/repository/${namespace}/${repository}/manifest/${first_manifest_digest}/labels"
+                              echo "Querying specific manifest: $specific_manifest_api_url" >&2
+              
+                              specific_manifest_response=$(curl -s "$specific_manifest_api_url")
+                              echo "specific_manifest_response=${specific_manifest_response}"
+                              # Extract git.url and git.commit labels from the specific manifest
+                              git_url=$(echo "$specific_manifest_response" | jq -r '.labels[] | select(.key == "git.url") | .value// empty')
+                              git_commit=$(echo "$specific_manifest_response" | jq -r '.labels[] | select(.key == "git.commit") | .value// empty')
+                          fi
+                      else
+                          echo "Single-arch image, extracting labels directly" >&2
+              
+                          # Extract git.url and git.commit labels from current manifest
+                          git_url=$(echo "$manifest_response" | jq -r '.config.config.Labels["git.url"] // empty')
+                          git_commit=$(echo "$manifest_response" | jq -r '.config.config.Labels["git.commit"] // empty')
+                      fi
+              
+                      echo "Git URL: $git_url" >&2
+                      echo "Git Commit: $git_commit" >&2
                   fi
               
-                  # Add to output JSON
-                  jq --arg key "$component" --arg value "$full_image_uri" '. + {($key): $value}' "$temp_file" > "${temp_file}.tmp" && mv "${temp_file}.tmp" "$temp_file"
+                  # Add to output JSON with image URI, git.url, and git.commit
+                  jq --arg key "$component" \
+                     --arg image "$full_image_uri" \
+                     --arg giturl "$git_url" \
+                     --arg gitcommit "$git_commit" \
+                     '. + {($key): {image: $image, "git.url": $giturl, "git.commit": $gitcommit}}' \
+                     "$temp_file" > "${temp_file}.tmp" && mv "${temp_file}.tmp" "$temp_file"
               
                   echo "" >&2
               done < <(echo "$json_string" | jq -r 'to_entries[] | @base64')
@@ -137,12 +189,20 @@ spec:
               set -e
               echo "SNAPSHOT=${SNAPSHOT}"
               COMPONENT_NAME=feast-operator-poc
-              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]' <<< "${SNAPSHOT}")
+              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
+              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
               echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+              echo "GIT_COMMIT=${GIT_COMMIT}"
+              echo "GIT_URL=${GIT_URL}"
 
               COMPONENT_NAME=feature-server-poc
               FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]' <<< "${SNAPSHOT}")
+              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
               echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
+              echo "GIT_COMMIT=${GIT_COMMIT}"
+              echo "GIT_URL=${GIT_URL}"
     - name: provision-eaas-space
       runAfter:
         - test-snapshot
@@ -261,15 +321,24 @@ spec:
 
               echo "SNAPSHOT=${SNAPSHOT}"
               COMPONENT_NAME=feast-operator-poc
-              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]' <<< "${SNAPSHOT}")
+              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
+              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
               echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+              echo "GIT_COMMIT=${GIT_COMMIT}"
+              echo "GIT_URL=${GIT_URL}"
 
               COMPONENT_NAME=feature-server-poc
               FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]' <<< "${SNAPSHOT}")
+              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
               echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
+              echo "GIT_COMMIT=${GIT_COMMIT}"
+              echo "GIT_URL=${GIT_URL}"
 
-              REPO_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .source.git.url' <<< "${SNAPSHOT}")
-              REVISION=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .source.git.revision' <<< "${SNAPSHOT}")
+              REPO_URL=${GIT_URL}
+              REVISION=${GIT_COMMIT}
+              
               echo "REPO_URL=${REPO_URL}"
               echo "REVISION=${REVISION}"
               git clone "${REPO_URL}" src_code
