@@ -87,3 +87,4 @@ trainer,quay.io/opendatahub/trainer
 mlflow,quay.io/opendatahub/mlflow
 mlflow-operator,quay.io/opendatahub/mlflow-operator
 eval-hub,quay.io/opendatahub/eval-hub
+spark-operator,quay.io/opendatahub/spark-operator

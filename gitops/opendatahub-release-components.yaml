@@ -1945,3 +1945,21 @@ spec:
       dockerfileUrl: packages/maas/Dockerfile.workspace
       revision: odh-release
       url: https://github.com/opendatahub-io/odh-dashboard.git
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-oci-ta","bundle":"latest"}'
+    mintmaker.appstudio.redhat.com/disabled: true
+  name: spark-operator
+spec:
+  application: opendatahub-release
+  componentName: spark-operator
+  containerImage: quay.io/opendatahub/spark-operator
+  source:
+    git:
+      context: .
+      dockerfileUrl: Dockerfile
+      revision: odh-release
+      url: https://github.com/opendatahub-io/spark-operator.git

@@ -52,6 +52,7 @@ on:
           - mlflow
           - mlflow-operator
           - eval-hub
+          - spark-operator
           # Add all valid components here
       pr_target_branch:
         description: 'Branch to open the PR against (e.g. master).'
