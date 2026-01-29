@@ -86,7 +86,7 @@ spec:
     description: Build Version Tag to be used for fetching component images
     name: build-version-tag
     type: string
-  - default: "main"
+  - default: "odh"
     description: Utils repo branch
     name: utils-repo-branch
     type: string
