@@ -65,7 +65,7 @@ spec:
               done < <(echo "$COMPONENTS" | jq -r 'to_entries[] | @base64')
     - name: provision-eaas-space
       runAfter:
-        - test-snapshot
+        - audit-snapshot
       taskRef:
         resolver: git
         params:
