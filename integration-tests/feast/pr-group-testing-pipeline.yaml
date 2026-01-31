@@ -68,6 +68,8 @@ spec:
                   if skopeo inspect "docker://quay/io/${repo_path}:${TAG}" &>/dev/null; then
                       echo "No image found with tag ${TAG}, falling back to the ${FALLBACK_TAG} image for ${repo_path}"
                       TAG=${FALLBACK_TAG}
+                  else
+                    echo "found the image with tag ${TAG}"
                   fi
                       
                   
