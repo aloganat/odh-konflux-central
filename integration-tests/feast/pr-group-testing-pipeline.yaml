@@ -20,16 +20,6 @@ spec:
       workspaces:
       - name: basic-auth
         workspace: git-auth
-      taskSpec:
-        params:
-          - name: COMPONENTS
-            description: List of components in the group
-        results:
-        - description: Snapshot json string
-          name: SNAPSHOT
-        workspaces:
-          - name: basic-auth
-            optional: true
       taskRef:
         resolver: git
         params:
