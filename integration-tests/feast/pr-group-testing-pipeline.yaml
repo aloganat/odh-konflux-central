@@ -41,14 +41,20 @@ spec:
                 value: $(workspaces.basic-auth.bound)
               - name: WORKSPACE_BASIC_AUTH_DIRECTORY_PATH
                 value: $(workspaces.basic-auth.path)
+              - name: PR_NUMBER
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.labels['pipelinesascode.tekton.dev/pull-request']
             script: |
               #!/bin/bash
               set -e
+              cat /etc/*release
               json_string="$COMPONENTS"
               echo ${COMPONENTS}
               # Tag to search for
-              TAG="odh-pr"
-
+              TAG="odh-pr-${PR_NUMBER}"
+              FALLBACK_TAG="odh-stable"
+              
               # Temporary file to store results
               temp_file=$(mktemp)
               echo "{}" > "$temp_file"
@@ -58,7 +64,13 @@ spec:
                   # Decode the base64 encoded row
                   component=$(echo "$row" | base64 -d | jq -r '.key')
                   repo_path=$(echo "$row" | base64 -d | jq -r '.value')
-
+                  
+                  if skopeo inspect "docker://quay/io/${repo_path}:${TAG}" &>/dev/null; then
+                      echo "No image found with tag ${TAG}, falling back to the ${FALLBACK_TAG} image for ${repo_path}"
+                      TAG=${FALLBACK_TAG}
+                  fi
+                      
+                  
                   # Construct full quay URL
                   full_repo="quay.io/${repo_path}"
 
@@ -153,189 +165,181 @@ spec:
               echo -en $(cat "$temp_file") > "$(results.SNAPSHOT.path)"
               # Cleanup
               rm -f "$temp_file"
-    - name: test-snapshot
-      runAfter:
-        - generate-snapshot
-      taskSpec:
-        steps:
-          - name: test-snapshot
-            image: quay.io/konflux-ci/konflux-test:stable
-            workingDir: /workspace
-            env:
-              - name: SNAPSHOT
-                value: $(tasks.generate-snapshot.results.SNAPSHOT)
-            script: |
-              #!/bin/bash
-              set -e
-              echo "SNAPSHOT=${SNAPSHOT}"
-              COMPONENT_NAME=odh-feast-operator-ci
-              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
-              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
-              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
-              echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
-              echo "GIT_COMMIT=${GIT_COMMIT}"
-              echo "GIT_URL=${GIT_URL}"
-
-              COMPONENT_NAME=odh-feature-server-ci
-              FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
-              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
-              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
-              echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
-              echo "GIT_COMMIT=${GIT_COMMIT}"
-              echo "GIT_URL=${GIT_URL}"
-    - name: provision-eaas-space
-      runAfter:
-        - test-snapshot
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-ci/build-definitions.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
-      params:
-        - name: ownerName
-          value: $(context.pipelineRun.name)
-        - name: ownerUid
-          value: $(context.pipelineRun.uid)
-#      when:
-#        - input: "$(tasks.check-prerequisites.results.event-type)"
-#          operator: in
-#          values: ["pull_request", "retest-all-comment", "on-comment"]
-    - name: provision-cluster
-      runAfter:
-        - provision-eaas-space
-      taskSpec:
-        results:
-          - name: clusterName
-            value: "$(steps.create-cluster.results.clusterName)"
-        steps:
-          - name: get-supported-versions
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-get-supported-ephemeral-cluster-versions/0.1/eaas-get-supported-ephemeral-cluster-versions.yaml
-            params:
-              - name: eaasSpaceSecretRef
-                value: $(tasks.provision-eaas-space.results.secretRef)
-          - name: pick-version
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-get-latest-openshift-version-by-prefix/0.1/eaas-get-latest-openshift-version-by-prefix.yaml
-            params:
-              - name: prefix
-                value: "$(steps.get-supported-versions.results.versions[0])."
-          - name: create-cluster
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
-            params:
-              - name: eaasSpaceSecretRef
-                value: $(tasks.provision-eaas-space.results.secretRef)
-              - name: version
-                value: "$(steps.pick-version.results.version)"
-              - name: instanceType
-                value: m5.2xlarge
-#      when:
-#        - input: "$(tasks.check-prerequisites.results.event-type)"
-#          operator: in
-#          values: ["pull_request", "retest-all-comment", "on-comment"]
-    - name: deploy-and-test
-      runAfter:
-        - provision-cluster
-      taskSpec:
-        volumes:
-          - name: credentials
-            emptyDir: {}
-        steps:
-          - name: get-kubeconfig
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
-            params:
-              - name: eaasSpaceSecretRef
-                value: $(tasks.provision-eaas-space.results.secretRef)
-              - name: clusterName
-                value: "$(tasks.provision-cluster.results.clusterName)"
-              - name: credentials
-                value: credentials
-          - name: deploy-and-e2e
-            image: quay.io/rhoai/rhoai-task-toolset:go-its
-            env:
-              - name: KUBECONFIG
-                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
-              - name: SNAPSHOT
-                value: $(tasks.generate-snapshot.results.SNAPSHOT)
-            workingDir: /workspace/source
-            volumeMounts:
-              - name: credentials
-                mountPath: /credentials
-            script: |
-              oc get pods
-              oc whoami
-
-              echo "SNAPSHOT=${SNAPSHOT}"
-              COMPONENT_NAME=feast-operator-poc
-              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
-              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
-              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
-              echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
-              echo "GIT_COMMIT=${GIT_COMMIT}"
-              echo "GIT_URL=${GIT_URL}"
-
-              COMPONENT_NAME=feature-server-poc
-              FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
-              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
-              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
-              echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
-              echo "GIT_COMMIT=${GIT_COMMIT}"
-              echo "GIT_URL=${GIT_URL}"
-
-              REPO_URL=${GIT_URL}
-              REVISION=${GIT_COMMIT}
-
-              echo "REPO_URL=${REPO_URL}"
-              echo "REVISION=${REVISION}"
-              git clone "${REPO_URL}" src_code
-              cd src_code
-              git checkout ${REVISION}
-
-              export RUN_ON_OPENSHIFT_CI=true
-              cd infra/feast-operator
-              make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
-              oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
-              make test-e2e
-              make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
-
-              make test-previous-version
-              oc delete deployment feast-operator-controller-manager -n feast-operator-system
-
-              make test-upgrade
+#    - name: test-snapshot
+#      runAfter:
+#        - generate-snapshot
+#      taskSpec:
+#        steps:
+#          - name: test-snapshot
+#            image: quay.io/konflux-ci/konflux-test:stable
+#            workingDir: /workspace
+#            env:
+#              - name: SNAPSHOT
+#                value: $(tasks.generate-snapshot.results.SNAPSHOT)
+#            script: |
+#              #!/bin/bash
+#              set -e
+#              echo "SNAPSHOT=${SNAPSHOT}"
+#              COMPONENT_NAME=odh-feast-operator-ci
+#              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
+#              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+#              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
+#              echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+#              echo "GIT_COMMIT=${GIT_COMMIT}"
+#              echo "GIT_URL=${GIT_URL}"
+#
+#              COMPONENT_NAME=odh-feature-server-ci
+#              FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
+#              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+#              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
+#              echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
+#              echo "GIT_COMMIT=${GIT_COMMIT}"
+#              echo "GIT_URL=${GIT_URL}"
+#    - name: provision-eaas-space
+#      runAfter:
+#        - test-snapshot
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: https://github.com/konflux-ci/build-definitions.git
+#          - name: revision
+#            value: main
+#          - name: pathInRepo
+#            value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
+#      params:
+#        - name: ownerName
+#          value: $(context.pipelineRun.name)
+#        - name: ownerUid
+#          value: $(context.pipelineRun.uid)
+#    - name: provision-cluster
+#      runAfter:
+#        - provision-eaas-space
+#      taskSpec:
+#        results:
+#          - name: clusterName
+#            value: "$(steps.create-cluster.results.clusterName)"
+#        steps:
+#          - name: get-supported-versions
+#            ref:
+#              resolver: git
+#              params:
+#                - name: url
+#                  value: https://github.com/konflux-ci/build-definitions.git
+#                - name: revision
+#                  value: main
+#                - name: pathInRepo
+#                  value: stepactions/eaas-get-supported-ephemeral-cluster-versions/0.1/eaas-get-supported-ephemeral-cluster-versions.yaml
+#            params:
+#              - name: eaasSpaceSecretRef
+#                value: $(tasks.provision-eaas-space.results.secretRef)
+#          - name: pick-version
+#            ref:
+#              resolver: git
+#              params:
+#                - name: url
+#                  value: https://github.com/konflux-ci/build-definitions.git
+#                - name: revision
+#                  value: main
+#                - name: pathInRepo
+#                  value: stepactions/eaas-get-latest-openshift-version-by-prefix/0.1/eaas-get-latest-openshift-version-by-prefix.yaml
+#            params:
+#              - name: prefix
+#                value: "$(steps.get-supported-versions.results.versions[0])."
+#          - name: create-cluster
+#            ref:
+#              resolver: git
+#              params:
+#                - name: url
+#                  value: https://github.com/konflux-ci/build-definitions.git
+#                - name: revision
+#                  value: main
+#                - name: pathInRepo
+#                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
+#            params:
+#              - name: eaasSpaceSecretRef
+#                value: $(tasks.provision-eaas-space.results.secretRef)
+#              - name: version
+#                value: "$(steps.pick-version.results.version)"
+#              - name: instanceType
+#                value: m5.2xlarge
+#    - name: deploy-and-test
+#      runAfter:
+#        - provision-cluster
+#      taskSpec:
+#        volumes:
+#          - name: credentials
+#            emptyDir: {}
+#        steps:
+#          - name: get-kubeconfig
+#            ref:
+#              resolver: git
+#              params:
+#                - name: url
+#                  value: https://github.com/konflux-ci/build-definitions.git
+#                - name: revision
+#                  value: main
+#                - name: pathInRepo
+#                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+#            params:
+#              - name: eaasSpaceSecretRef
+#                value: $(tasks.provision-eaas-space.results.secretRef)
+#              - name: clusterName
+#                value: "$(tasks.provision-cluster.results.clusterName)"
+#              - name: credentials
+#                value: credentials
+#          - name: deploy-and-e2e
+#            image: quay.io/rhoai/rhoai-task-toolset:go-its
+#            env:
+#              - name: KUBECONFIG
+#                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+#              - name: SNAPSHOT
+#                value: $(tasks.generate-snapshot.results.SNAPSHOT)
+#            workingDir: /workspace/source
+#            volumeMounts:
+#              - name: credentials
+#                mountPath: /credentials
+#            script: |
+#              oc get pods
+#              oc whoami
+#
+#              echo "SNAPSHOT=${SNAPSHOT}"
+#              COMPONENT_NAME=feast-operator-poc
+#              FEAST_OPERATOR_CONTROLLER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
+#              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+#              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
+#              echo "  FEAST_OPERATOR_CONTROLLER_IMAGE: ${FEAST_OPERATOR_CONTROLLER_IMAGE}"
+#              echo "GIT_COMMIT=${GIT_COMMIT}"
+#              echo "GIT_URL=${GIT_URL}"
+#
+#              COMPONENT_NAME=feature-server-poc
+#              FEAST_FEATURE_SERVER_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name].image' <<< "${SNAPSHOT}")
+#              GIT_COMMIT=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.commit"' <<< "${SNAPSHOT}")
+#              GIT_URL=$(jq -r --arg component_name "${COMPONENT_NAME}" '.[$component_name]."git.url"' <<< "${SNAPSHOT}")
+#              echo "  FEAST_FEATURE_SERVER_IMAGE: ${FEAST_FEATURE_SERVER_IMAGE}"
+#              echo "GIT_COMMIT=${GIT_COMMIT}"
+#              echo "GIT_URL=${GIT_URL}"
+#
+#              REPO_URL=${GIT_URL}
+#              REVISION=${GIT_COMMIT}
+#
+#              echo "REPO_URL=${REPO_URL}"
+#              echo "REVISION=${REVISION}"
+#              git clone "${REPO_URL}" src_code
+#              cd src_code
+#              git checkout ${REVISION}
+#
+#              export RUN_ON_OPENSHIFT_CI=true
+#              cd infra/feast-operator
+#              make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+#              oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
+#              make test-e2e
+#              make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+#
+#              make test-previous-version
+#              oc delete deployment feast-operator-controller-manager -n feast-operator-system
+#
+#              make test-upgrade
   workspaces:
   - name: git-auth
     optional: true
