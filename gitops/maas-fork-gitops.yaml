@@ -1,0 +1,42 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build-multi-platform-oci-ta","bundle":"latest"}'
+    mintmaker.appstudio.redhat.com/disabled: 'true'
+    build.appstudio.openshift.io/request: configure-pac-no-mr
+  name: odh-maas-api-ci-poc
+spec:
+  application: poc
+  componentName: odh-maas-api-ci-poc
+  containerImage: quay.io/opendatahub/maas-api
+  source:
+    git:
+      context: maas-api
+      dockerfileUrl: maas-api/Dockerfile
+      revision: konflux-its
+      url: https://github.com/opendatahub-io/models-as-a-service.git
+---
+apiVersion: appstudio.redhat.com/v1beta2
+kind: IntegrationTestScenario
+metadata:
+  labels:
+    test.appstudio.openshift.io/optional: "false"
+  name: models-as-a-service-ci-its-poc
+  namespace: open-data-hub-tenant
+spec:
+  application: poc
+  contexts:
+    - description: execute the integration test when component odh-operator updates
+      name: component_odh-maas-api-ci-poc
+  resolverRef:
+    params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: maas
+      - name: pathInRepo
+        value: integration-tests/models-as-a-service/pr-test-pipeline.yaml
+    resolver: git
+    resourceKind: pipeline
