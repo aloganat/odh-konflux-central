@@ -776,7 +776,7 @@ spec:
     - name: operator-repo-name
       value: opendatahub-io/opendatahub-operator
     - name: operator-branch-name
-      value: konflux-poc-1
+      value: stable
     - name: bundle-component-name
       value: odh-operator-bundle-ci
     - name: fbcf-component-name
