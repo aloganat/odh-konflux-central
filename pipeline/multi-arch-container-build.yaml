@@ -766,6 +766,39 @@ spec:
       operator: in
       values:
       - "true"
+  - name: trigger-operator-build
+    workspaces:
+    - name: basic-auth
+      workspace: git-auth
+    params:
+    - name: operator-component-name
+      value: odh-operator-ci
+    - name: operator-repo-name
+      value: opendatahub-io/opendatahub-operator
+    - name: operator-branch-name
+      value: konflux-poc-1
+    - name: bundle-component-name
+      value: odh-operator-bundle-ci
+    - name: fbcf-component-name
+      value: odh-fbc-fragment-ci
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks.git
+      - name: revision
+        value: odh
+      - name: pathInRepo
+        value: konflux-tekton-tasks/trigger-operator-build/0.1/trigger-operator-build.yaml
+    when:
+    - input: $(tasks.pipeline-success-indicator.status)
+      operator: in
+      values:
+      - "Succeeded"
+    - input: $(params.pipeline-type)
+      operator: in
+      values:
+        - "push"
   workspaces:
   - name: git-auth
     optional: true
