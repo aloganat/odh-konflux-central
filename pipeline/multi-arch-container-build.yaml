@@ -799,31 +799,6 @@ spec:
       operator: in
       values:
         - "push"
-  - name: trigger-bundle-build
-    workspaces:
-    - name: basic-auth
-      workspace: git-auth
-    params:
-    - name: bundle-branch-name
-      value: main
-    taskRef:
-      resolver: git
-      params:
-      - name: url
-        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks.git
-      - name: revision
-        value: odh
-      - name: pathInRepo
-        value: konflux-tekton-tasks/trigger-bundle-build/0.1/trigger-bundle-build.yaml
-    when:
-    - input: $(tasks.pipeline-success-indicator.status)
-      operator: in
-      values:
-      - "Succeeded"
-    - input: $(params.pipeline-type)
-      operator: in
-      values:
-        - "push"
   workspaces:
   - name: git-auth
     optional: true
