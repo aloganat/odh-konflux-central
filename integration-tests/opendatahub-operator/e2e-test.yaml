@@ -17,7 +17,7 @@ spec:
       default: opendatahub-operator-system
     - name: BUILD_TYPE
       type: string
-      default: "CI"
+      default: "RELEASE"
   tasks:
     - name: parse-metadata
       taskRef:
