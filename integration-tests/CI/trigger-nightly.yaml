@@ -21,7 +21,7 @@ spec:
       - description: Trigger Nightly Tests
         name: TRIGGER_NIGHTLY_TESTS
         type: string
-        default: "false"
+        default: "true"
       - description: Trigger Slack Notification
         name: TRIGGER_SLACK
         type: string
