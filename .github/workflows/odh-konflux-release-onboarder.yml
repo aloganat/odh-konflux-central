@@ -97,10 +97,28 @@ jobs:
           echo "REPOSITORY=opendatahub-io/${{ inputs.component }}" >> $GITHUB_ENV
           echo "OKC_FOLDER=${{ inputs.component }}" >> $GITHUB_ENV
 
+      - name: Validate and set tag
+        run: |
+          BUILD_TYPE="${{ inputs.build_type }}"
+          VERSION="${{ inputs.version }}"
+
+          if [ "$BUILD_TYPE" = "CI" ]; then
+            echo "EFFECTIVE_TAG=odh-stable" >> $GITHUB_ENV
+            echo "APPLICATION_NAME=opendatahub-builds" >> $GITHUB_ENV
+          else
+            if [ -z "$VERSION" ]; then
+              echo "ERROR: Version must be provided for Release builds"
+              exit 1
+            fi
+            echo "EFFECTIVE_TAG=$VERSION" >> $GITHUB_ENV
+            echo "APPLICATION_NAME=opendatahub-release" >> $GITHUB_ENV
+          fi
+
+
       - name: Prepare Tekton files
         run: |
-          repo_folder="okc-repo/pipelines/${OKC_FOLDER}"
-          echo "Using pipeline path: $repo_folder"
+          repo_folder="okc-repo/pipelineruns/${OKC_FOLDER}"
+          echo "Using pipelinerun path: $repo_folder"
 
           if [ ! -d "$repo_folder" ]; then
             echo "ERROR: $repo_folder does not exist!"
@@ -108,19 +126,33 @@ jobs:
           fi
 
           mkdir -p extracted/.tekton
-          find "$repo_folder" -type f -name "*push.yaml" -exec cp {} extracted/.tekton/ \;
+
+          if [ "${{ inputs.build_type }}" = "Release" ]; then
+            echo "Release build → copying only push pipelineruns"
+
+            find "$repo_folder" -type f -name "*push.yaml" | while read file; do
+              base=$(basename "$file" .yaml)
+              new_name="${base}-release.yaml"
+              cp "$file" "extracted/.tekton/$new_name"
+            done
+
+          else
+            echo "CI build → copying all pipelinerun yaml files"
+            find "$repo_folder" -type f -name "*.yaml" -exec cp {} extracted/.tekton/ \;
+          fi
 
           if [ -z "$(ls -A extracted/.tekton)" ]; then
-            echo "ERROR: No *push.yaml files found in $repo_folder"
+            echo "ERROR: No pipelinerun files found"
             exit 1
           fi
 
           find extracted/.tekton/ -type f -name "*.yaml" | while read file; do
-            # Replace $$OUTPUT_IMAGE_TAG$$ with version (preserves 'v' prefix and handles all occurrences including build-args)
-            sed -i -E 's|\$\$OUTPUT_IMAGE_TAG\$\$|'"${{ inputs.version }}"'|g' "$file"
-            # Replace $$TARGET_BRANCH$$ with build branch (the branch images are built from)
+            sed -i -E 's|\$\$OUTPUT_IMAGE_TAG\$\$|'"${EFFECTIVE_TAG}"'|g' "$file"
             sed -i -E 's|\$\$TARGET_BRANCH\$\$|'"${{ inputs.build_branch }}"'|g' "$file"
+
+            sed -i -E 's|(appstudio\.openshift\.io/application:).*|\1 '"${APPLICATION_NAME}"'|g' "$file"
           done
+
 
       - name: Prepare GitHub workflow files (if applicable)
         run: |
@@ -152,7 +184,7 @@ jobs:
 
           #branch_name="appstudio-${{ inputs.component }}-konflux-replicator"
           #branch_name="appstudio-${{ inputs.component }}-konflux-replicator-${{ inputs.version }}"
-          branch_name="appstudio-${{ inputs.component }}-konflux-replicator-${{ inputs.version }}-$(date +%s)"
+          branch_name="appstudio-${{ inputs.component }}-konflux-replicator-${EFFECTIVE_TAG}-$(date +%s)"
           echo "BRANCH_NAME=$branch_name" >> $GITHUB_ENV
 
           git checkout -B "$branch_name" ${{ inputs.pr_target_branch }}
@@ -187,7 +219,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update Tekton output-image tags to version ${{ inputs.version }}"
+          git commit -m "Update Tekton output-image tags to ${EFFECTIVE_TAG}"
           git push --set-upstream origin "$branch_name"
           echo "commit=true" >> $GITHUB_ENV
 
@@ -201,8 +233,9 @@ jobs:
             --repo "${REPOSITORY}" \
             --base "${{ inputs.pr_target_branch }}" \
             --head "${BRANCH_NAME}" \
-            --title "Update Tekton files to version ${{ inputs.version }}" \
-            --body "This PR updates the \`output-image\` tags and CEL expressions in \`.tekton/\` to version \`${{ inputs.version }}\`.
+            --title "Update Tekton files to ${EFFECTIVE_TAG}" \
+            --body "This PR updates the \`output-image\` tags and CEL expressions in \`.tekton/\` to \`${EFFECTIVE_TAG}\`.
 
-          - **PR target branch:** \`${{ inputs.pr_target_branch }}\` (changes land here first)
-          - **Build branch:** \`${{ inputs.build_branch }}\` (branch that images are built from)"
+          - **PR target branch:** \`${{ inputs.pr_target_branch }}\`
+          - **Build branch:** \`${{ inputs.build_branch }}\`"
+
