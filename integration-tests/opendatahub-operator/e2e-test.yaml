@@ -239,7 +239,7 @@ spec:
 #              cd /workspace/source
 #
 #          - name: deploy-and-e2e
-#            image: golang:1.25-alpine
+#            image: registry.access.redhat.com/ubi9/go-toolset
 #            computeResources:
 #              requests:
 #                memory: "16Gi"
@@ -259,13 +259,10 @@ spec:
 #            script: |
 #              set -ex  # Show commands and exit on error
 #
-#              # Install dependencies
-#              apk add --no-cache bash make git curl
-#
 #              # Install kubectl
 #              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-#              install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-#              rm kubectl
+#              chmod +x kubectl
+#              mv kubectl /tmp/kubectl
 #
 #              # Deploy the operator
 #              echo "Deploying operator..."
@@ -273,7 +270,7 @@ spec:
 #
 #              # Wait for operator to be ready
 #              echo "Waiting for operator to be ready..."
-#              kubectl wait --for=condition=available --timeout=60s deployment/opendatahub-operator-controller-manager -n $(params.namespace)
+#              /tmp/kubectl wait --for=condition=available --timeout=60s deployment/opendatahub-operator-controller-manager -n $(params.namespace)
 #
 #              # Run e2e tests
 #              echo "Running e2e tests..."
@@ -282,9 +279,9 @@ spec:
 #                echo "============================================"
 #                echo "E2E tests failed with exit code: $EXIT_CODE"
 #                echo "Pods in namespace $(params.namespace):"
-#                kubectl get pods -n $(params.namespace) || true
+#                /tmp/kubectl get pods -n $(params.namespace) || true
 #                echo "Operator logs:"
-#                kubectl logs -n $(params.namespace) -l control-plane=controller-manager --tail=100 || true
+#                /tmp/kubectl logs -n $(params.namespace) -l control-plane=controller-manager --tail=100 || true
 #                exit $EXIT_CODE
 #              }
 #      when:
