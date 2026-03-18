@@ -98,8 +98,8 @@ flowchart TD
     genSnapshot --> auditSnapshot
   end
 
-  subgraph op_block [Block 1 - Operator Build]
-    cloneOp["clone-operator-repo"]
+  subgraph op_block [Block 1 - Operator Build - CONDITIONAL]
+    cloneOp["clone-operator-repo<br/>(when: snapshot-contains-operator!=true)"]
     prefetchManifests["prefetch-manifests"]
     auditManifests["audit-manifests"]
     buildOp["build-operator-container"]
@@ -107,6 +107,8 @@ flowchart TD
     pushMeta["push-build-metadata"]
     cloneOp --> prefetchManifests --> auditManifests --> buildOp --> applyTagsOp --> pushMeta
   end
+
+  resolveOp["resolve-operator-image<br/>(always runs)"]
 
   subgraph bundle_block [Block 2 - Bundle Processor + Build]
     cloneBuildConfig["clone-build-config-repo"]
@@ -130,8 +132,8 @@ flowchart TD
   init_block --> snapshot_block
   snapshot_block --> op_block
   auditSnapshot --> cloneOp
-  op_block --> bundle_block
-  pushMeta --> cloneBuildConfig
+  pushMeta --> resolveOp
+  resolveOp --> cloneBuildConfig
   bundle_block --> fbc_block
   applyTagsBundle --> fbcProcessor
 ```
@@ -140,6 +142,7 @@ flowchart TD
 
 - **Single `rhoai-init` + `init`**: Run once at the top. All downstream tasks reuse their results (`mandatory-tag`, `build` flag, `skip-slack-message`, etc.).
 - **Group snapshot**: After init, `generate-snapshot` and `audit-snapshot` (from `early-gate/group-pipeline.yaml`) parse the group components, extract PR metadata, and determine whether the snapshot contains the operator. These run before the operator build.
+- **Conditional operator build**: When `audit-snapshot.results.snapshot-contains-operator` is `"true"`, the entire operator build block (`clone-operator-repo` through `push-build-metadata`) is skipped via Tekton `when` conditions and cascading result-dependency skips. A `resolve-operator-image` task (always runs, positioned after the build block via `runAfter`) extracts the operator image from the snapshot or inspects the registry for the just-built image. All downstream tasks reference `resolve-operator-image.results` for the operator image, not the build tasks directly.
 - **Two repo clones**: `opendatahub-operator` for operator build; `ODH-Build-Config` for bundle + FBC builds.
 - **Processors as Tekton tasks**: `bundle-processor` and `fbc-processor` are implemented as Tekton tasks (referenced via git resolver), replacing the GitHub workflows.
 - **No push-then-clone for bundle-processor**: Runtime artifacts from operator build (operands-map, manifests) are passed directly through OCI trusted artifacts to the bundle-processor. The `push-build-metadata` task is still included (after `apply-tags-operator`) to push manifests to the `odh-build-metadata` repo for external consumers, but the bundle-processor does not depend on it.
@@ -901,9 +904,9 @@ workspaces:
 ```yaml
 results:
 - name: OPERATOR_IMAGE_URL
-  value: $(tasks.build-operator-container.results.IMAGE_URL)
+  value: $(tasks.resolve-operator-image.results.OPERATOR_IMAGE_URL)
 - name: OPERATOR_IMAGE_DIGEST
-  value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
+  value: $(tasks.resolve-operator-image.results.OPERATOR_IMAGE_DIGEST)
 - name: BUNDLE_IMAGE_URL
   value: $(tasks.build-bundle-container.results.IMAGE_URL)
 - name: BUNDLE_IMAGE_DIGEST
@@ -913,9 +916,9 @@ results:
 - name: CATALOG_IMAGE_DIGEST
   value: $(tasks.build-fbc-container.results.IMAGE_DIGEST)
 - name: CHAINS-GIT_URL
-  value: $(tasks.clone-operator-repo.results.url)
+  value: $(tasks.resolve-operator-image.results.OPERATOR_GIT_URL)
 - name: CHAINS-GIT_COMMIT
-  value: $(tasks.clone-operator-repo.results.commit)
+  value: $(tasks.resolve-operator-image.results.OPERATOR_GIT_COMMIT)
 ```
 
 ### 6.4 Complete task list
@@ -998,8 +1001,10 @@ Results: `pull-request-author`, `pull-request-number`, `git-repo`, `git-org`, `g
 | Field | Value |
 |---|---|
 | runAfter | `audit-snapshot` |
-| when | `$(tasks.init.results.build) in ["true"]` |
+| when | `$(tasks.init.results.build) in ["true"]` AND `$(tasks.audit-snapshot.results.snapshot-contains-operator) notin ["true"]` |
 | taskRef | bundle resolver: `quay.io/konflux-ci/tekton-catalog/task-git-clone-oci-ta:0.1@sha256:0a89e1a...` |
+
+**Conditional skip**: When `snapshot-contains-operator=true`, this task is when-skipped. All downstream tasks (`prefetch-manifests` through `push-build-metadata`) are cascading-skipped via result-dependency chains.
 
 Params:
 - `url` = `$(params.operator-git-url)`
@@ -1092,8 +1097,10 @@ Params:
 | Field | Value |
 |---|---|
 | runAfter | `apply-tags-operator` |
-| when | `$(tasks.build-operator-container.status) in ["Succeeded"]` |
+| when | `$(tasks.audit-snapshot.results.snapshot-contains-operator) notin ["true"]` |
 | taskRef | inline taskSpec |
+
+Cascading-skipped when operator build is skipped (result dependencies on `build-operator-container` and `prefetch-manifests`). Also has explicit `when` condition as belt-and-suspenders.
 
 Params:
 - `build-metadata-repo` = `$(params.build-metadata-repo)`
@@ -1108,11 +1115,36 @@ Workspaces: `basic-auth` = `git-auth`
 
 ---
 
-#### Task 11: `clone-build-config-repo`
+#### Task 11: `resolve-operator-image`
 
 | Field | Value |
 |---|---|
 | runAfter | `push-build-metadata` |
+| when | (none -- always runs) |
+| taskRef | inline taskSpec |
+
+**Always runs**. Positioned after `push-build-metadata` via `runAfter`; since skipped tasks don't block ordering-dependent downstream tasks, this executes regardless of whether the operator build ran.
+
+Params:
+- `SNAPSHOT` = `$(tasks.generate-snapshot.results.SNAPSHOT)`
+- `snapshot-contains-operator` = `$(tasks.audit-snapshot.results.snapshot-contains-operator)`
+- `operator-output-image` = `$(params.operator-output-image)`
+- `operator-git-url` = `$(params.operator-git-url)`
+- `operator-revision` = `$(params.operator-revision)`
+
+Logic:
+- If `snapshot-contains-operator=true`: parses SNAPSHOT JSON, extracts `odh-operator-ci` image (URL@digest), git URL, and git commit
+- If `snapshot-contains-operator=false`: uses `skopeo inspect` on `operator-output-image` to get the digest of the just-built image; uses pipeline params for git info
+
+Results: `OPERATOR_IMAGE_URL`, `OPERATOR_IMAGE_DIGEST`, `OPERATOR_GIT_URL`, `OPERATOR_GIT_COMMIT`
+
+---
+
+#### Task 12: `clone-build-config-repo`
+
+| Field | Value |
+|---|---|
+| runAfter | `resolve-operator-image` |
 | when | `$(tasks.init.results.build) in ["true"]` |
 | taskRef | bundle resolver: `quay.io/konflux-ci/tekton-catalog/task-git-clone-oci-ta:0.1@sha256:0a89e1a...` |
 
@@ -1128,7 +1160,7 @@ Results: `SOURCE_ARTIFACT`, `url`, `commit`
 
 ---
 
-#### Task 12: `bundle-processor`
+#### Task 13: `bundle-processor`
 
 | Field | Value |
 |---|---|
@@ -1137,21 +1169,22 @@ Results: `SOURCE_ARTIFACT`, `url`, `commit`
 
 Params:
 - `SOURCE_ARTIFACT` = `$(tasks.clone-build-config-repo.results.SOURCE_ARTIFACT)`
-- `CACHI2_ARTIFACT` = `$(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)`
 - `ociStorage` = `$(params.bundle-output-image).bundle-processed`
 - `ociArtifactExpiresAfter` = `"1h"`
-- `OPERATOR_IMAGE_URL` = `$(tasks.build-operator-container.results.IMAGE_URL)`
-- `OPERATOR_IMAGE_DIGEST` = `$(tasks.build-operator-container.results.IMAGE_DIGEST)`
+- `OPERATOR_IMAGE_URL` = `$(tasks.resolve-operator-image.results.OPERATOR_IMAGE_URL)`
+- `OPERATOR_IMAGE_DIGEST` = `$(tasks.resolve-operator-image.results.OPERATOR_IMAGE_DIGEST)`
 - `QUAY_TAG` = `$(params.quay-tag)`
 - `BRANCH` = `$(params.build-config-revision)`
 - `UTILS_REPO_URL` = `$(params.utils-repo-url)`
 - `UTILS_REPO_BRANCH` = `$(params.utils-repo-ref)`
 
+Note: `CACHI2_ARTIFACT` removed from bundle-processor (script doesn't use it).
+
 Results: `SOURCE_ARTIFACT` (patched ODH-Build-Config with bundle/)
 
 ---
 
-#### Task 13: `prefetch-dependencies-bundle`
+#### Task 14: `prefetch-dependencies-bundle`
 
 | Field | Value |
 |---|---|
@@ -1170,7 +1203,7 @@ Results: `SOURCE_ARTIFACT`, `CACHI2_ARTIFACT`
 
 ---
 
-#### Task 14: `build-bundle-container`
+#### Task 15: `build-bundle-container`
 
 | Field | Value |
 |---|---|
@@ -1195,7 +1228,7 @@ Results: `IMAGE_URL`, `IMAGE_DIGEST`
 
 ---
 
-#### Task 15: `apply-tags-bundle`
+#### Task 16: `apply-tags-bundle`
 
 | Field | Value |
 |---|---|
@@ -1209,7 +1242,7 @@ Params:
 
 ---
 
-#### Task 16: `fbc-processor`
+#### Task 17: `fbc-processor`
 
 | Field | Value |
 |---|---|
@@ -1232,7 +1265,7 @@ Results: `SOURCE_ARTIFACT` (patched ODH-Build-Config with catalog/)
 
 ---
 
-#### Task 17: `prefetch-dependencies-fbc`
+#### Task 18: `prefetch-dependencies-fbc`
 
 | Field | Value |
 |---|---|
@@ -1251,7 +1284,7 @@ Results: `SOURCE_ARTIFACT`, `CACHI2_ARTIFACT`
 
 ---
 
-#### Task 18: `build-fbc-container`
+#### Task 19: `build-fbc-container`
 
 | Field | Value |
 |---|---|
@@ -1277,7 +1310,7 @@ Results: `IMAGE_URL`, `IMAGE_DIGEST` (all scalar)
 
 ---
 
-#### Task 19: `apply-tags-fbc`
+#### Task 20: `apply-tags-fbc`
 
 | Field | Value |
 |---|---|
@@ -1291,7 +1324,7 @@ Params:
 
 ---
 
-#### Task 20: `validate-fbc` (optional, for correctness)
+#### Task 21: `validate-fbc` (optional, for correctness)
 
 | Field | Value |
 |---|---|

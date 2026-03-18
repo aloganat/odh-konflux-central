@@ -10,9 +10,6 @@ spec:
   - name: SOURCE_ARTIFACT
     description: OCI artifact containing ODH-Build-Config source
     type: string
-  - name: CACHI2_ARTIFACT
-    description: OCI artifact from operator prefetch-manifests (contains operands-map)
-    type: string
   - name: ociStorage
     description: OCI storage location for output artifact
     type: string
@@ -21,10 +18,10 @@ spec:
     type: string
     default: "1h"
   - name: OPERATOR_IMAGE_URL
-    description: Freshly-built operator image URL
+    description: Resolved operator image URL (from build or snapshot)
     type: string
   - name: OPERATOR_IMAGE_DIGEST
-    description: Freshly-built operator image digest
+    description: Resolved operator image digest (from build or snapshot)
     type: string
   - name: QUAY_TAG
     description: Quay tag for image lookups
@@ -62,7 +59,6 @@ spec:
     args:
     - use
     - $(params.SOURCE_ARTIFACT)=/var/workdir/source
-    - $(params.CACHI2_ARTIFACT)=/var/workdir/cachi2
 
   - name: clone-utils
     image: quay.io/rhoai/rhoai-task-toolset:latest

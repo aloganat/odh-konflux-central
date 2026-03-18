@@ -140,11 +140,11 @@ spec:
 
   results:
   - name: OPERATOR_IMAGE_URL
-    description: Built operator image URL
-    value: $(tasks.build-operator-container.results.IMAGE_URL)
+    description: Resolved operator image URL (from build or snapshot)
+    value: $(tasks.resolve-operator-image.results.OPERATOR_IMAGE_URL)
   - name: OPERATOR_IMAGE_DIGEST
-    description: Built operator image digest
-    value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
+    description: Resolved operator image digest (from build or snapshot)
+    value: $(tasks.resolve-operator-image.results.OPERATOR_IMAGE_DIGEST)
   - name: BUNDLE_IMAGE_URL
     description: Built bundle image URL
     value: $(tasks.build-bundle-container.results.IMAGE_URL)
@@ -158,11 +158,11 @@ spec:
     description: Built catalog image digest
     value: $(tasks.build-fbc-container.results.IMAGE_DIGEST)
   - name: CHAINS-GIT_URL
-    description: Operator git URL for Tekton Chains
-    value: $(tasks.clone-operator-repo.results.url)
+    description: Operator git URL
+    value: $(tasks.resolve-operator-image.results.OPERATOR_GIT_URL)
   - name: CHAINS-GIT_COMMIT
-    description: Operator git commit for Tekton Chains
-    value: $(tasks.clone-operator-repo.results.commit)
+    description: Operator git commit
+    value: $(tasks.resolve-operator-image.results.OPERATOR_GIT_COMMIT)
 
   # ==========================================================================
   # TASKS
@@ -338,6 +338,10 @@ spec:
       operator: in
       values:
       - "true"
+    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+      operator: notin
+      values:
+      - "true"
     workspaces:
     - name: basic-auth
       workspace: git-auth
@@ -365,6 +369,11 @@ spec:
         value: "odh"
       - name: pathInRepo
         value: "konflux-tekton-tasks/prefetch-operand-manifests-oci-ta/0.1/prefetch-operand-manifests-oci-ta.yaml"
+    when:
+    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+      operator: notin
+      values:
+      - "true"
     workspaces:
     - name: git-basic-auth
       workspace: git-auth
@@ -375,6 +384,11 @@ spec:
     description: Audit the collected manifests
     runAfter:
     - prefetch-manifests
+    when:
+    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+      operator: notin
+      values:
+      - "true"
     taskSpec:
       volumes:
       - name: workdir
@@ -457,6 +471,10 @@ spec:
       operator: in
       values:
       - "true"
+    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+      operator: notin
+      values:
+      - "true"
 
   - name: apply-tags-operator
     runAfter:
@@ -479,6 +497,11 @@ spec:
       - name: kind
         value: task
       resolver: bundles
+    when:
+    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+      operator: notin
+      values:
+      - "true"
 
   - name: push-build-metadata
     description: Push operator build manifests to odh-build-metadata repo
@@ -555,12 +578,90 @@ spec:
           git commit -m "build-meta for operator image ${OUTPUT_IMAGE_DIGEST}"
           git push
     when:
-    - input: "$(tasks.build-operator-container.status)"
-      operator: in
-      values: ["Succeeded"]
+    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+      operator: notin
+      values:
+      - "true"
     workspaces:
     - name: basic-auth
       workspace: git-auth
+
+  # --------------------------------------------------------------------------
+  # Resolve operator image (always runs -- merges build vs snapshot paths)
+  # --------------------------------------------------------------------------
+
+  - name: resolve-operator-image
+    description: |
+      Resolves the operator image URL and digest. When the operator was already
+      in the snapshot (build skipped), extracts from SNAPSHOT JSON. When the
+      operator was built in this pipeline, inspects the registry for the digest.
+    runAfter:
+    - push-build-metadata
+    params:
+    - name: SNAPSHOT
+      value: $(tasks.generate-snapshot.results.SNAPSHOT)
+    - name: snapshot-contains-operator
+      value: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+    - name: operator-output-image
+      value: $(params.operator-output-image)
+    - name: operator-git-url
+      value: $(params.operator-git-url)
+    - name: operator-revision
+      value: $(params.operator-revision)
+    taskSpec:
+      params:
+      - name: SNAPSHOT
+      - name: snapshot-contains-operator
+      - name: operator-output-image
+      - name: operator-git-url
+      - name: operator-revision
+      results:
+      - name: OPERATOR_IMAGE_URL
+        description: Resolved operator image URL
+      - name: OPERATOR_IMAGE_DIGEST
+        description: Resolved operator image digest
+      - name: OPERATOR_GIT_URL
+        description: Operator source git URL
+      - name: OPERATOR_GIT_COMMIT
+        description: Operator source git commit
+      steps:
+      - name: resolve
+        image: quay.io/rhoai/rhoai-task-toolset:latest
+        env:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: SNAPSHOT_CONTAINS_OPERATOR
+          value: $(params.snapshot-contains-operator)
+        - name: OPERATOR_OUTPUT_IMAGE
+          value: $(params.operator-output-image)
+        - name: OPERATOR_GIT_URL
+          value: $(params.operator-git-url)
+        - name: OPERATOR_REVISION
+          value: $(params.operator-revision)
+        script: |
+          #!/bin/bash
+          set -eo pipefail
+
+          if [ "${SNAPSHOT_CONTAINS_OPERATOR}" == "true" ]; then
+            echo "Operator image found in snapshot, extracting..."
+            IMAGE=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"].image')
+            RESOLVED_URL="${IMAGE%%@*}"
+            RESOLVED_DIGEST="${IMAGE##*@}"
+            RESOLVED_GIT_URL=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.url"] // empty')
+            RESOLVED_GIT_COMMIT=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.commit"] // empty')
+          else
+            echo "Operator was built in this pipeline, inspecting registry..."
+            RESOLVED_URL="${OPERATOR_OUTPUT_IMAGE}"
+            RESOLVED_DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${OPERATOR_OUTPUT_IMAGE}")
+            RESOLVED_GIT_URL="${OPERATOR_GIT_URL}"
+            RESOLVED_GIT_COMMIT="${OPERATOR_REVISION}"
+          fi
+
+          echo "Resolved operator image: ${RESOLVED_URL}@${RESOLVED_DIGEST}"
+          echo -n "${RESOLVED_URL}" > "$(results.OPERATOR_IMAGE_URL.path)"
+          echo -n "${RESOLVED_DIGEST}" > "$(results.OPERATOR_IMAGE_DIGEST.path)"
+          echo -n "${RESOLVED_GIT_URL}" > "$(results.OPERATOR_GIT_URL.path)"
+          echo -n "${RESOLVED_GIT_COMMIT}" > "$(results.OPERATOR_GIT_COMMIT.path)"
 
   # --------------------------------------------------------------------------
   # Block 2: Bundle processor + Bundle build
@@ -568,7 +669,7 @@ spec:
 
   - name: clone-build-config-repo
     runAfter:
-    - push-build-metadata
+    - resolve-operator-image
     params:
     - name: url
       value: $(params.build-config-git-url)
@@ -602,16 +703,14 @@ spec:
     params:
     - name: SOURCE_ARTIFACT
       value: $(tasks.clone-build-config-repo.results.SOURCE_ARTIFACT)
-    - name: CACHI2_ARTIFACT
-      value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
     - name: ociStorage
       value: $(params.bundle-output-image).bundle-processed
     - name: ociArtifactExpiresAfter
       value: "1h"
     - name: OPERATOR_IMAGE_URL
-      value: $(tasks.build-operator-container.results.IMAGE_URL)
+      value: $(tasks.resolve-operator-image.results.OPERATOR_IMAGE_URL)
     - name: OPERATOR_IMAGE_DIGEST
-      value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
+      value: $(tasks.resolve-operator-image.results.OPERATOR_IMAGE_DIGEST)
     - name: QUAY_TAG
       value: $(params.quay-tag)
     - name: BRANCH
