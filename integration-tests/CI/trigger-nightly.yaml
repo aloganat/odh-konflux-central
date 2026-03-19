@@ -58,7 +58,7 @@ spec:
               echo "$skopeo_inspect" | jq -r '.Name + "@" + .Digest' | tr -d '\n' | tee "$(results.latest-catalog-ci-image.path)"
               echo "$skopeo_inspect" | jq -r '.Labels."build-metadata-url"'  | tr -d '\n' | tee "$(results.latest-build-metadata-url.path)"
               echo "$skopeo_inspect" | jq -r '.Labels."build-url"'  | tr -d '\n' | tee "$(results.latest-catalog-ci-build-url.path)"
-              skopeo inspect --raw "docker://${CATALOG_IMAGE}-nightly" | sha256sum | tr -d ' -\n' | tee "$(results.previous-nightly-sha.path)"
+              skopeo inspect --raw "docker://${CATALOG_IMAGE}-nightly" | sha256sum | tr -d ' \n-' | tee "$(results.previous-nightly-sha.path)"
       - name: tag-nightly
         runAfter:
         - choose-ci-build
@@ -215,10 +215,11 @@ spec:
               mkdir slack && cd slack
               git init .
               git remote add origin git@github.com:red-hat-data-services/rhods-devops-infra.git
-              git fetch origin main
-              git show origin/main:tools/send-slack-message/send-slack-message.sh > ./send-slack-message.sh
-              git show origin/main:tools/send-slack-message/tracer-diff.sh > ./tracer-diff.sh
-              git show origin/main:tools/tracer/tracer.sh > ./tracer.sh
+              BRANCH=main
+              git fetch origin $BRANCH
+              git show origin/${BRANCH}:tools/send-slack-message/send-slack-message.sh > ./send-slack-message.sh
+              git show origin/${BRANCH}:tools/send-slack-message/tracer-diff.sh > ./tracer-diff.sh
+              git show origin/${BRANCH}:tools/tracer/tracer.sh > ./tracer.sh
               chmod +x ./send-slack-message.sh
               chmod +x ./tracer-diff.sh
               chmod +x ./tracer.sh
@@ -227,7 +228,7 @@ spec:
               ./tracer-diff.sh --mode 2 --only-changes "--odh --digest $PREVIOUS_NIGHTLY_SHA" "--odh -i $LATEST_CATALOG_CI_IMAGE"   | tee tracer-diff.txt
               SUBST_VARS='$LATEST_CATALOG_CI_IMAGE $LATEST_BUILD_METADATA_URL $BUILD_URL'
               slack_message=$(echo "$MESSAGE_TEMPLATE" | envsubst "$SUBST_VARS")
-              ./send-slack-message.sh -c "$CHANNEL" -m "$slack_message" -m "$(cat tracer-diff.txt)" -f tracer-output.txt --emit-thread-id | tr -d '\n' | tee "$(results.thread-id.path)"
+              ./send-slack-message.sh -c "$CHANNEL" -m "$slack_message" -m "$(cat tracer-diff.txt)" -f tracer-output.txt --emit-thread | tr -d '\n' | tee "$(results.thread-id.path)"
       - name: trigger-nightly-tests
         description: trigger nightly tests
         when:
