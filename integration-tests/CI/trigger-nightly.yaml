@@ -41,6 +41,8 @@ spec:
             description: "the operator image reference (with SHA) to use for nightly"
           - name: latest-catalog-ci-build-url
             description: "the build url for the latest catalog"
+          - name: previous-nightly-sha
+            description: "the previous nightly"
           steps:
           - image: quay.io/rhoai/rhoai-task-toolset:odh-nightly-runner
             name: get-latest-catalog-ci-build-sha
@@ -56,6 +58,7 @@ spec:
               echo "$skopeo_inspect" | jq -r '.Name + "@" + .Digest' | tr -d '\n' | tee "$(results.latest-catalog-ci-image.path)"
               echo "$skopeo_inspect" | jq -r '.Labels."build-metadata-url"'  | tr -d '\n' | tee "$(results.latest-build-metadata-url.path)"
               echo "$skopeo_inspect" | jq -r '.Labels."build-url"'  | tr -d '\n' | tee "$(results.latest-catalog-ci-build-url.path)"
+              skopeo inspect --raw "docker://${CATALOG_IMAGE}-nightly" | sha256sum | tr -d ' -\n' | tee "$(results.previous-nightly-sha.path)"
       - name: tag-nightly
         runAfter:
         - choose-ci-build
@@ -158,6 +161,73 @@ spec:
               echo "Bundle: $BUNDLE_IMAGE"
               echo "FBC: $CATALOG_IMAGE"
               echo "Operator: $OPERATOR_IMAGE"
+      - name: slack-notification
+        description: notify slack about new nightly
+        when:
+        - input: $(params.TRIGGER_SLACK)
+          operator: in
+          values:
+          - "true"
+        runAfter:
+        - tag-nightly
+        workspaces:
+        - name: data
+          workspace: data
+        taskSpec:
+          results:
+          - name: thread-id
+            description: "the thread id of the sent slack message"
+          workspaces:
+          - name: data
+            optional: false
+          steps:
+          - image: quay.io/rhoai/rhoai-task-toolset:odh-nightly-runner
+            env:
+            - name: HOME
+              value: /workspace
+            - name: SLACK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: rhoai-devops-bot-slack-token
+                  key: SLACK_TOKEN
+            - name: LATEST_CATALOG_CI_IMAGE
+              value: $(tasks.choose-ci-build.results.latest-catalog-ci-image)
+            - name: LATEST_BUILD_METADATA_URL
+              value: $(tasks.choose-ci-build.results.latest-build-metadata-url)
+            - name: BUILD_URL
+              value: $(tasks.choose-ci-build.results.latest-catalog-ci-build-url)
+            - name: PREVIOUS_NIGHTLY_SHA
+              value: $(tasks.choose-ci-build.results.previous-nightly-sha)
+            - name: CHANNEL
+              valueFrom:
+                configMapKeyRef:
+                  name: slack-config
+                  key: odh-notification-channel
+            - name: MESSAGE_TEMPLATE
+              valueFrom:
+                configMapKeyRef:
+                  name: slack-config
+                  key: nightly-message-template
+            workingDir: /workspace
+            script: |
+              #!/bin/bash
+              set -e
+              mkdir slack && cd slack
+              git init .
+              git remote add origin git@github.com:red-hat-data-services/rhods-devops-infra.git
+              git fetch origin main
+              git show origin/main:tools/send-slack-message/send-slack-message.sh > ./send-slack-message.sh
+              git show origin/main:tools/send-slack-message/tracer-diff.sh > ./tracer-diff.sh
+              git show origin/main:tools/tracer/tracer.sh > ./tracer.sh
+              chmod +x ./send-slack-message.sh
+              chmod +x ./tracer-diff.sh
+              chmod +x ./tracer.sh
+
+              ./tracer.sh --odh -i "$LATEST_CATALOG_CI_IMAGE" --show-commits | tee tracer-output.txt
+              ./tracer-diff.sh --mode 2 --only-changes "--odh --digest $PREVIOUS_NIGHTLY_SHA" "--odh -i $LATEST_CATALOG_CI_IMAGE"   | tee tracer-diff.txt
+              SUBST_VARS='$LATEST_CATALOG_CI_IMAGE $LATEST_BUILD_METADATA_URL $BUILD_URL'
+              slack_message=$(echo "$MESSAGE_TEMPLATE" | envsubst "$SUBST_VARS")
+              ./send-slack-message.sh -c "$CHANNEL" -m "$slack_message" -m "$(cat tracer-diff.txt)" -f tracer-output.txt --emit-thread-id | tr -d '\n' | tee "$(results.thread-id.path)"
       - name: trigger-nightly-tests
         description: trigger nightly tests
         when:
@@ -166,13 +236,15 @@ spec:
           values:
           - "true"
         runAfter:
-        - tag-nightly
+        - slack-notification
         taskSpec:
           steps:
           - image: quay.io/rhoai/rhoai-task-toolset:odh-nightly-runner
             env:
             - name: HOME
               value: /workspace
+            - name: THREAD_ID
+              value: $(tasks.slack-notification.results.thread-id)
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -194,67 +266,7 @@ spec:
               -H "Accept: application/vnd.github.v3+json" \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Content-Type: application/json" \
-              -d '{ "ref": "main", "inputs": { "target_branch": "'"$TARGET"'" } }'
-      - name: slack-notification
-        description: notify slack about new nightly
-        when:
-        - input: $(params.TRIGGER_SLACK)
-          operator: in
-          values:
-          - "true"
-        runAfter:
-        - tag-nightly
-        workspaces:
-        - name: data
-          workspace: data
-        taskSpec:
-          workspaces:
-          - name: data
-            optional: false
-          steps:
-          - image: quay.io/rhoai/rhoai-task-toolset:odh-nightly-runner
-            env:
-            - name: HOME
-              value: /workspace
-            - name: SLACK_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: rhoai-devops-bot-slack-token
-                  key: SLACK_TOKEN
-            - name: LATEST_CATALOG_CI_IMAGE
-              value: $(tasks.choose-ci-build.results.latest-catalog-ci-image)
-            - name: LATEST_BUILD_METADATA_URL
-              value: $(tasks.choose-ci-build.results.latest-build-metadata-url)
-            - name: BUILD_URL
-              value: $(tasks.choose-ci-build.results.latest-catalog-ci-build-url)
-            - name: CHANNEL
-              valueFrom:
-                configMapKeyRef:
-                  name: slack-config
-                  key: odh-notification-channel
-            - name: MESSAGE_TEMPLATE
-              valueFrom:
-                configMapKeyRef:
-                  name: slack-config
-                  key: nightly-message-template
-            workingDir: /workspace
-            script: |
-              #!/bin/bash
-              set -e
-              mkdir slack && cd slack
-              git init .
-              git remote add origin git@github.com:red-hat-data-services/rhods-devops-infra.git
-              git fetch origin main
-              git show origin/main:tools/send-slack-message/send-slack-message.sh > ./send-slack-message.sh
-              git show origin/main:tools/tracer/tracer.sh > ./tracer.sh
-              chmod +x ./send-slack-message.sh
-              chmod +x ./tracer.sh
-
-              ./tracer.sh --odh -i "$LATEST_CATALOG_CI_IMAGE" --show-commits | tee tracer-output.txt
-
-              SUBST_VARS='$LATEST_CATALOG_CI_IMAGE $LATEST_BUILD_METADATA_URL $BUILD_URL'
-              slack_message=$(echo "$MESSAGE_TEMPLATE" | envsubst "$SUBST_VARS")
-              ./send-slack-message.sh -c "$CHANNEL" -m "$slack_message" -f tracer-output.txt -v
+              -d '{ "ref": "main", "inputs": { "target_branch": "'"$TARGET"'", "thread_id": "'"$THREAD_ID"'" } }'
     workspaces:
     - name: data
       optional: false
