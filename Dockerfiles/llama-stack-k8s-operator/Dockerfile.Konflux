@@ -1,0 +1,98 @@
+ARG BUILD_MODE=ODH
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+       ; \
+    fi
+# Build the manager binary
+ARG BASE_IMAGE_ODH=--platform=$BUILDPLATFORM
+ARG BASE_IMAGE_RHOAI=registry.redhat.io/ubi9/go-toolset:1.25@sha256:8b211cc8793d8013140844e8070aa584a8eb3e4e6e842ea4b03dd9914b1a5dc6
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS builder
+ARG TARGETOS=linux
+ARG TARGETARCH
+# >>> [ODH] <<<
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+ARG CGO_ENABLED=1
+# >>> [END RHOAI] <<<
+
+# >>> [ODH] <<<
+# FIPS compliance settings
+# For native builds: CGO_ENABLED=1 with full FIPS OpenSSL support
+# For cross-builds: CGO_ENABLED=0 with pure Go FIPS (strictfipsruntime)
+ENV GOEXPERIMENT=strictfipsruntime
+# >>> [END ODH] <<<
+
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
+
+# Copy the go source
+COPY main.go main.go
+COPY api/ api/
+COPY controllers/ controllers/
+COPY pkg/ pkg/
+COPY distributions.json distributions.json
+
+# Build the manager binary
+RUN if [ "$BUILD_MODE" = "ODH" ]; then \
+      # Cross-compilation is handled natively by Go via GOOS and GOARCH ; \
+      # This runs on the build host's native architecture, not under QEMU emulation ; \
+    fi
+USER root
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      # GOARCH is intentionally left empty to automatically detect the host architecture ; \
+      # This ensures the binary matches the platform where docker-build is executed ; \
+      CGO_ENABLED=${CGO_ENABLED} GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -o manager main.go ; \
+    else \
+      # Determine if we're cross-compiling by comparing BUILDPLATFORM and TARGETPLATFORM ; \
+      # - Native builds (same platform): CGO_ENABLED=1 with openssl tag for full FIPS OpenSSL support ; \
+      # - Cross builds (different platform): CGO_ENABLED=0 with pure Go FIPS (no CGO = no cross-compiler needed) ; \
+      echo "Building for TARGETPLATFORM=${TARGETPLATFORM} on BUILDPLATFORM=${BUILDPLATFORM}" && \ ; \
+      if [ "${BUILDPLATFORM}" = "${TARGETPLATFORM}" ]; then \ ; \
+      echo "Native build detected - using CGO_ENABLED=1 with OpenSSL FIPS"; \ ; \
+      CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \ ; \
+      go build -a -tags=strictfipsruntime,openssl -o manager main.go; \ ; \
+      else \ ; \
+      echo "Cross-compilation detected - using CGO_ENABLED=0 with pure Go FIPS"; \ ; \
+      CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \ ; \
+      go build -a -tags=strictfipsruntime -o manager main.go; \ ; \
+      fi ; \
+    fi
+
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi9/ubi-minimal:latest
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1}
+WORKDIR /
+COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/controllers/manifests ./manifests/
+RUN if [ "$BUILD_MODE" = "ODH" ]; then \
+       ; \
+      # Install openssl - use minimal options for reliability under QEMU emulation ; \
+      microdnf install -y --setopt=install_weak_deps=0 --setopt=tsflags=nodocs openssl && \ ; \
+      microdnf clean all ; \
+       ; \
+    fi
+USER 1001
+
+ENTRYPOINT ["/manager"]
+# >>> [RHOAI] <<<
+
+LABEL com.redhat.component="odh-llama-stack-k8s-operator-container" \
+      description="kubernetes operator that is responsible for creating and managing llama-stack server" \
+      summary="kubernetes operator that is responsible for creating and managing llama-stack server" \
+      name="rhoai/odh-llama-stack-k8s-operator-rhel9" \
+      maintainer="['managed-open-data-hub@redhat.com']" \
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-llama-stack-k8s-operator" \
+      io.k8s.description="odh-llama-stack-k8s-operator" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
+# >>> [END RHOAI] <<<

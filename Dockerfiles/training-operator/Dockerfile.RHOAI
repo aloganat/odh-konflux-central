@@ -1,0 +1,40 @@
+ARG SOURCE_CODE=.
+FROM registry.access.redhat.com/ubi9/go-toolset:1.25@sha256:8b211cc8793d8013140844e8070aa584a8eb3e4e6e842ea4b03dd9914b1a5dc6 as builder
+
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
+
+# Copy the go source
+COPY . .
+
+# Build
+USER root
+RUN CGO_ENABLED=1 GOOS=linux GO111MODULE=on GOEXPERIMENT=strictfipsruntime go build -tags strictfipsruntime -a -o manager cmd/training-operator.v1/main.go
+
+# Runtime
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183 AS runtime
+
+ARG USER=65532
+
+LABEL com.redhat.component="odh-training-operator-container" \
+      name="managed-open-data-hub/odh-training-operator-rhel8" \
+      description="Training Operator is a Kubernetes-native project for fine-tuning and scalable distributed training of AI/ML models created with various frameworks such as PyTorch." \
+      summary="odh-training-operator" \
+      maintainer="['managed-open-data-hub@redhat.com']" \
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-training-operator" \
+      io.k8s.description="odh-training-operator" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
+
+RUN microdnf install -y bind-utils
+
+WORKDIR /
+COPY --from=builder /workspace/manager .
+## Create a non-root user with UID 65532 and switch to it
+USER ${USER}:${USER}
+ENTRYPOINT ["/manager"]

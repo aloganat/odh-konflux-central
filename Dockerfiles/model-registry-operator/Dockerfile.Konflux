@@ -1,0 +1,98 @@
+# Unified Dockerfile – select build mode via BUILD_MODE arg
+ARG BUILD_MODE=ODH
+
+# ============================================================
+# ODH Build
+# ============================================================
+# Build the manager binary
+FROM registry.access.redhat.com/ubi9/go-toolset:1.25.7 AS odh-builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
+
+# Copy the go source
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/ internal/
+
+# Copy Makefile and build command requirements
+COPY config/ config/
+COPY hack/ hack/
+COPY Makefile Makefile
+
+USER root
+
+# Build
+# the GOARCH has not a default value to allow the binary be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} make build
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS odh-stage-1
+WORKDIR /
+COPY --from=odh-builder /workspace/bin/manager .
+USER 65532:65532
+
+ENTRYPOINT ["/manager"]
+
+
+# ============================================================
+# RHOAI Build
+# ============================================================
+# Build arguments
+ARG SOURCE_CODE=.
+ 
+# Build the manager binary
+FROM registry.access.redhat.com/ubi9/go-toolset:1.25@sha256:8b211cc8793d8013140844e8070aa584a8eb3e4e6e842ea4b03dd9914b1a5dc6 as rhoai-builder
+ 
+## Build args to be used at this step
+ARG SOURCE_CODE
+ 
+WORKDIR /workspace
+
+COPY go.mod go.mod
+COPY go.sum go.sum
+
+RUN go mod download
+
+# Copy the go source
+COPY . .
+
+# Build
+USER root
+RUN CGO_ENABLED=1 GOOS=linux GOEXPERIMENT=strictfipsruntime go build -tags strictfipsruntime -a -o manager cmd/main.go
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183 AS rhoai-stage-1
+ 
+WORKDIR /
+COPY --from=rhoai-builder /workspace/manager .
+ 
+USER 65532:65532
+ENTRYPOINT ["/manager"]
+ 
+LABEL com.redhat.component="odh-model-registry-operator-container" \
+      name="managed-open-data-hub/odh-model-registry-operator-rhel8" \
+      description="Manages lifecycle of RHOAI Model Registry custom resources and associated Kubernetes resources" \
+      summary="odh-model-registry-operator-container" \
+      maintainer="['managed-open-data-hub@redhat.com']" \
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-model-registry-operator-container" \
+      io.k8s.description="odh-model-registry-operator" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
+
+# ============================================================
+# Stage selector – picks the build based on BUILD_MODE
+# ============================================================
+FROM ${odh-stage-1} AS odh-output
+FROM ${rhoai-stage-1} AS rhoai-output
+
+ARG BUILD_MODE=ODH
+FROM ${BUILD_MODE}-output AS final

@@ -1,0 +1,115 @@
+ARG BUILD_MODE=ODH
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      # Copyright 2021 IBM Corporation ; \
+    else \
+      # Copyright 2021-2024 The Kubeflow Authors ; \
+    fi
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      #     http://www.apache.org/licenses/LICENSE-2.0 ; \
+    else \
+      #      http://www.apache.org/licenses/LICENSE-2.0 ; \
+    fi
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ARG BASE_IMAGE_ODH=registry.access.redhat.com/ubi9/go-toolset:1.25.7-1771417345
+ARG BASE_IMAGE_RHOAI=registry.access.redhat.com/ubi9/go-toolset:1.24@sha256:6234f572204d672a0ee0686d748fbb9b7b05679368bf0d7a4446e13970e58060
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS builder
+
+ARG BASE_IMAGE_ODH=registry.access.redhat.com/ubi9/go-toolset:1.25.7-1771417345
+ARG BASE_IMAGE_RHOAI=registry.access.redhat.com/ubi9/go-toolset:1.24@sha256:6234f572204d672a0ee0686d748fbb9b7b05679368bf0d7a4446e13970e58060
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS builder
+
+USER root
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      dnf install -y cmake clang openssl-1:3.5.1-4.el9_7 ; \
+       ; \
+    else \
+      dnf install -y cmake clang openssl ; \
+    fi
+
+COPY ${SOURCE_CODE}/go.mod ./
+COPY ${SOURCE_CODE}/go.sum ./
+# >>> [ODH] <<<
+COPY ${SOURCE_CODE}/kubernetes_platform/go.mod ./kubernetes_platform/go.mod
+COPY ${SOURCE_CODE}/api/go.mod ./api/go.mod
+
+RUN GO111MODULE=on go mod download
+# >>> [END ODH] <<<
+
+# Copy the source
+COPY ${SOURCE_CODE}/ ./
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      GO111MODULE=on CGO_ENABLED=1 GOEXPERIMENT=strictfipsruntime go build -tags strictfipsruntime -o /bin/apiserver ./backend/src/apiserver/ && \ ; \
+    else \
+      # FIPS_ENABLED=1 (default): FIPS-compliant build with strictfipsruntime (requires CGO) ; \
+      # FIPS_ENABLED=0: Non-FIPS build for local development on Apple Silicon (pure Go, no CGO) ; \
+      if [ "${FIPS_ENABLED}" = "0" ]; then \ ; \
+      GO111MODULE=on CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \ ; \
+      go build -o /bin/apiserver ./backend/src/apiserver/; \ ; \
+      elif [ "${FIPS_ENABLED}" = "1" ]; then \ ; \
+      GO111MODULE=on CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \ ; \
+      GOEXPERIMENT=strictfipsruntime \ ; \
+      go build -tags strictfipsruntime -o /bin/apiserver ./backend/src/apiserver/; \ ; \
+      else \ ; \
+      echo "ERROR: FIPS_ENABLED must be '0' or '1', got '${FIPS_ENABLED}'" && exit 1; \ ; \
+      fi && \ ; \
+    fi
+    dnf clean all
+
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi9/python-311
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1} AS compiler
+
+WORKDIR /bin
+
+COPY --from=builder /opt/app-root/src/backend/src/apiserver/config/ /config
+COPY --from=builder /bin/apiserver /bin/apiserver
+
+# >>> [ODH] <<<
+COPY --from=compiler /samples/ /samples/
+# >>> [END ODH] <<<
+RUN chmod +x /bin/apiserver
+
+USER root
+
+# Adding CA certificate so API server can download pipeline through URL and wget is used for liveness/readiness probe command
+RUN microdnf install -y ca-certificates wget
+
+USER 1001
+
+# Expose apiserver port
+EXPOSE 8888
+
+# Start the apiserver
+# >>> [ODH] <<<
+CMD ["/bin/sh", "-c", "/bin/apiserver --config=/config --sampleconfig=/config/sample_config.json -logtostderr=true --logLevel=${LOG_LEVEL}"]
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+CMD /bin/apiserver --config=/config --sampleconfig=/config/sample_config.json -logtostderr=true
+
+LABEL com.redhat.component="odh-ml-pipelines-api-server-v2-container" \
+      name="managed-open-data-hub/odh-ml-pipelines-api-server-v2-rhel8" \
+      description="odh-ml-pipelines-api-server-v2" \
+      summary="odh-ml-pipelines-api-server-v2" \
+      maintainer="['managed-open-data-hub@redhat.com']" \
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-ml-pipelines-api-server-v2" \
+      io.k8s.description="odh-ml-pipelines-api-server-v2" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
+# >>> [END RHOAI] <<<

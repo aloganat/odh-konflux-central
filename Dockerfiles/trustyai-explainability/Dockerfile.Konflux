@@ -1,0 +1,95 @@
+ARG BUILD_MODE=ODH
+
+# Copyright 2023 Red Hat
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Build arguments
+ARG SOURCE_CODE=.
+ARG CI_CONTAINER_VERSION="unknown"
+
+# >>> [RHOAI] <<<
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0 AS stage
+# >>> [END RHOAI] <<<
+
+ARG BASE_IMAGE_ODH=registry.access.redhat.com/ubi8/openjdk-17:latest
+ARG BASE_IMAGE_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS build
+
+# >>> [ODH] <<<
+## Build args to be used at this step
+ARG SOURCE_CODE
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+RUN cd ./cachi2/output/deps/generic && \
+    for file in *.zip; do unzip -d /root/ "$file"; done
+# >>> [END RHOAI] <<<
+
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi8/openjdk-17-runtime:latest
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/openjdk-17-runtime@sha256:657b0b73a0ce60a7bb824bea1cc9559365178a5cbf72a487a86120b1dfd83a8b
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1} AS runtime
+
+
+# >>> [ODH] <<<
+###############################################################################
+FROM registry.access.redhat.com/ubi8/openjdk-17-runtime:latest AS runtime
+ENV LANGUAGE='en_US:en'
+
+## Livebuilder CODE BEGIN ##
+# >>> [END ODH] <<<
+# We make four distinct layers so if there are application changes the library layers can be re-used
+# >>> [ODH] <<<
+COPY --from=build /build/explainability-service/target/quarkus-app/lib/ /deployments/lib/
+COPY --from=build /build/explainability-service/target/quarkus-app/*.jar /deployments/
+COPY --from=build /build/explainability-service/target/quarkus-app/app/ /deployments/app/
+COPY --from=build /build/explainability-service/target/quarkus-app/quarkus/ /deployments/quarkus/
+## Livebuilder CODE END ##
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+COPY --from=stage /root/explainability-service/target/quarkus-app/lib/ /deployments/lib/
+COPY --from=stage /root/explainability-service/target/quarkus-app/*.jar /deployments/
+COPY --from=stage /root/explainability-service/target/quarkus-app/app/ /deployments/app/
+COPY --from=stage /root/explainability-service/target/quarkus-app/quarkus/ /deployments/quarkus/
+# >>> [END RHOAI] <<<
+
+
+## Build args to be used at this step
+# >>> [ODH] <<<
+ARG CI_CONTAINER_VERSION
+# >>> [END ODH] <<<
+ARG USER=185
+ENV JAVA_OPTS="-Dquarkus.http.host=0.0.0.0 -Djava.zutil.logging.manager=org.jboss.logmanager.LogManager"
+ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
+
+LABEL com.redhat.component="odh-trustyai-service" \
+      name="managed-open-data-hub/odh-trustyai-service-rhel8" \
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      description="TrustyAI is a service to provide integration fairness and bias tracking to modelmesh-served models" \ ; \
+    else \
+      version="${CI_CONTAINER_VERSION}" \ ; \
+    fi
+      summary="odh-trustyai-service" \
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      maintainer="['managed-open-data-hub@redhat.com']" \ ; \
+    fi
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-trustyai-service" \
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      io.k8s.description="odh-trustyai-service" \ ; \
+    else \
+      maintainer="['managed-open-data-hub@redhat.com']" \ ; \
+      description="TrustyAI is a service to provide integration fairness and bias tracking to modelmesh-served models" \ ; \
+    fi
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"

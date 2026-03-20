@@ -1,0 +1,104 @@
+ARG BUILD_MODE=ODH
+
+RUN if [ "$BUILD_MODE" = "ODH" ]; then \
+      # Build the manager binary ; \
+      # ; \
+      # The Docker context is expected to be: ; \
+      # ; \
+      # ${PATH_TO_KUBEFLOW/KUBEFLOW repo}/components ; \
+      # ; \
+       ; \
+    fi
+# Build arguments
+ARG SOURCE_CODE=.
+# >>> [ODH] <<<
+ARG GOLANG_VERSION=1.25
+# >>> [END ODH] <<<
+
+# Use ubi9/go-toolset as base image
+ARG BASE_IMAGE_ODH=registry.access.redhat.com/ubi9/go-toolset:${GOLANG_VERSION}
+ARG BASE_IMAGE_RHOAI=registry.access.redhat.com/ubi9/go-toolset:1.25@sha256:8b211cc8793d8013140844e8070aa584a8eb3e4e6e842ea4b03dd9914b1a5dc6
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+## Build args to be used at this step
+ARG SOURCE_CODE
+
+# >>> [ODH] <<<
+# Set building workdir
+WORKDIR /workspace
+
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+WORKDIR /opt/rhods
+# >>> [END RHOAI] <<<
+# Copy the Go Modules manifests
+COPY ${SOURCE_CODE}/notebook-controller ./notebook-controller
+COPY ${SOURCE_CODE}/odh-notebook-controller ./odh-notebook-controller
+
+# >>> [ODH] <<<
+# Update building workdir
+WORKDIR /workspace/odh-notebook-controller
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+WORKDIR /opt/rhods/odh-notebook-controller
+# >>> [END RHOAI] <<<
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      ## Build the odh-notebook-controller ; \
+    else \
+      ## Build the kf-notebook-controller ; \
+    fi
+USER root
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      # Build ; \
+      CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} GOEXPERIMENT=strictfipsruntime go build -tags strictfipsruntime -a -o ./bin/manager main.go ; \
+    else \
+      # the GOARCH has not a default value to allow the binary be built according to the host where the command ; \
+      # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO ; \
+      # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore, ; \
+      # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform. ; \
+      if [ -z ${CACHITO_ENV_FILE} ]; then go mod download; else source ${CACHITO_ENV_FILE}; fi && \ ; \
+      CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -a -o ./bin/manager main.go ; \
+    fi
+
+# Use ubi9/ubi-minimal as base image
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi9/ubi-minimal:latest
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1}
+
+## Create a non-root user with UID 1001
+RUN useradd --uid 1001 --create-home --user-group --system rhods
+
+## Set workdir directory to user home
+WORKDIR /home/rhods
+
+## Copy odh-notebook-controller-manager binary from builder stage
+# >>> [ODH] <<<
+COPY --from=builder /workspace/odh-notebook-controller/bin/manager /manager
+COPY --from=builder /workspace/odh-notebook-controller/third_party/license.txt third_party/license.txt
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+COPY --from=builder /opt/rhods/odh-notebook-controller/bin/manager /manager
+# >>> [END RHOAI] <<<
+
+## Switch to a non-root user
+USER 1001:0
+
+ENTRYPOINT [ "/manager" ]
+# >>> [RHOAI] <<<
+
+LABEL com.redhat.component="odh-notebook-controller-container" \
+      name="rhoai/odh-notebook-controller-rhel9" \
+      description="odh-notebook-controller" \
+      summary="odh-notebook-controller" \
+      maintainer="['managed-open-data-hub@redhat.com']" \
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-notebook-controller" \
+      io.k8s.description="odh-notebook-controller" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
+# >>> [END RHOAI] <<<

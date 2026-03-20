@@ -1,0 +1,87 @@
+ARG BUILD_MODE=ODH
+
+# Simplified Dockerfile for model metadata collection
+# Since models-catalog.yaml is now checked in by CI/CD, we only need to copy the files
+ARG BASE_IMAGE_ODH=registry.access.redhat.com/ubi9-micro:latest
+ARG BASE_IMAGE_RHOAI=registry.access.redhat.com/ubi9-minimal:latest
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE}
+
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      # Create directory for mounting by other applications ; \
+      mkdir -p /app/data ; \
+    else \
+      # Create directories for mounting by other applications ; \
+      mkdir -p /app/data /app/benchmarks ; \
+    fi
+
+# Copy the pre-generated catalog and index files from the codebase
+COPY data/models-catalog.yaml /app/data/
+COPY data/models-index.yaml /app/data/
+COPY data/validated-models-catalog.yaml /app/data/
+COPY data/validated-models-index.yaml /app/data/
+COPY data/other-models-catalog.yaml /app/data/
+COPY data/other-models-index.yaml /app/data/
+
+# >>> [ODH] <<<
+# Copy sample data for benchmarks
+COPY sample-data/ /app/benchmarks/
+
+# >>> [END ODH] <<<
+# Set proper permissions
+RUN chmod 644 /app/data/models-catalog.yaml /app/data/models-index.yaml && \
+    chmod 644 /app/data/validated-models-catalog.yaml /app/data/validated-models-index.yaml && \
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      chmod 644 /app/data/other-models-catalog.yaml /app/data/other-models-index.yaml ; \
+    else \
+      chmod 644 /app/data/other-models-catalog.yaml /app/data/other-models-index.yaml && \ ; \
+      chmod -R 755 /app/benchmarks && \ ; \
+      chmod 644 /app/benchmarks/manifest.json && \ ; \
+      /bin/sh -c 'for f in /app/benchmarks/models/*/*/*/*; do [ -f "$f" ] && chmod 644 "$f" || true; done' ; \
+    fi
+
+# Create a non-root user for security
+RUN echo "catalog:x:1001:1001:Catalog User:/app:/sbin/nologin" >> /etc/passwd && \
+    echo "catalog:x:1001:" >> /etc/group && \
+    chown -R 1001:1001 /app
+
+# Switch to non-root user
+USER 1001
+
+# Set working directory
+WORKDIR /app
+
+# >>> [ODH] <<<
+# Volume mount points for external applications
+VOLUME ["/app/data", "/app/benchmarks"]
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+# Volume mount point for external applications
+VOLUME ["/app/data"]
+# >>> [END RHOAI] <<<
+
+# Default command - just keep container running for data access
+CMD ["sleep", "infinity"]
+
+# Labels for image metadata
+# >>> [ODH] <<<
+LABEL name="model-metadata-collection" \
+      version="1.0" \
+      description="Model metadata collection catalog generator" \
+      io.k8s.description="Generates and serves model metadata catalog" \
+      io.k8s.display-name="Model Metadata Collection" \
+      io.openshift.tags="ai,models,metadata,catalog"
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+LABEL \
+    com.redhat.component="odh-model-metadata-collection" \
+    name="managed-open-data-hub/odh-model-metadata-collection-rhel9" \
+    description="Container that provides a catalog Red Hat AI validated models." \
+    summary="model-metadata-collection" \
+    maintainer="['managed-open-data-hub@redhat.com']" \
+    io.openshift.expose-services="" \
+    io.k8s.display-name="model-metadata-collection" \
+    io.k8s.description="model-metadata-collection" \
+    io.openshift.tags="ai,models,metadata,catalog" \
+    com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
+# >>> [END RHOAI] <<<

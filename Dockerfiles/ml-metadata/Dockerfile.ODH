@@ -1,0 +1,65 @@
+FROM registry.access.redhat.com/ubi9/ubi:latest AS builder
+
+USER root
+
+RUN curl -o /etc/yum.repos.d/copr-galileo-bazel.repo \
+    https://copr.fedorainfracloud.org/coprs/galileo/bazel/repo/epel-9/galileo-bazel-epel-9.repo && \
+    dnf install -y \
+    which \
+    patch \
+    gcc \
+    clang \
+    cmake \
+    make \
+    openssl-devel \
+    libcurl-devel \
+    ca-certificates \
+    unzip \
+    git \
+    findutils \
+    python3 \
+    bazel5
+
+COPY . /mlmd-src
+WORKDIR /mlmd-src
+
+# Patch zetasql commit for UBI9 compatibility
+ENV PREVIOUS_ZETASQL_COMMIT ac37cf5c0d80b5605176fc0f29e87b12f00be693
+ENV PREVIOUS_ZETASQL_SHA 651a768cd51627f58aa6de7039aba9ddab22f4b0450521169800555269447840
+ENV CURRENT_ZETASQL_COMMIT f764f4e986ac1516ab5ae95e6d6ce2f4416cc6ff
+ENV CURRENT_ZETASQL_SHA 27e3d8bfd1f76918fc4d7a8f29646b8a0cdca567f921e0bff4a07f79448e92c0
+RUN \
+    sed -i "s/$PREVIOUS_ZETASQL_COMMIT/$CURRENT_ZETASQL_COMMIT/g" WORKSPACE && \
+    sed -i "s/$PREVIOUS_ZETASQL_SHA/$CURRENT_ZETASQL_SHA/g" WORKSPACE
+
+# Running in offline mode with --nofetch arg, cache and deps must be cloned
+# into the local root bazel cache
+# "-std=c++17" is needed in order to build with ZetaSQL.
+RUN bazel build -c opt --action_env=PATH \
+  --define=grpc_no_ares=true \
+  --copt="-Wno-maybe-uninitialized" \
+  //ml_metadata/metadata_store:metadata_store_server \
+  --cxxopt="-std=c++17" --host_cxxopt="-std=c++17"
+
+# copying libmysqlclient source onto THIRD_PARTY folder.
+RUN mkdir -p /mlmd-src/third_party
+RUN cp -RL /mlmd-src/bazel-mlmd-src/external/libmysqlclient /mlmd-src/third_party/mariadb-connector-c
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+COPY --from=builder /mlmd-src/bazel-bin/ml_metadata/metadata_store/metadata_store_server /bin/metadata_store_server
+COPY --from=builder /mlmd-src/third_party /mlmd-src/third_party
+
+ENV GRPC_PORT "8080"
+ENV METADATA_STORE_SERVER_CONFIG_FILE ""
+
+# Introduces tzdata package here to avoid LoadTimeZone check failed error in the metadata store server.
+RUN microdnf reinstall -y tzdata && \
+    microdnf clean all
+
+USER 65534:65534
+
+ENTRYPOINT \
+  "/bin/metadata_store_server" \
+  "--grpc_port=${GRPC_PORT}" \
+  "--metadata_store_server_config_file=${METADATA_STORE_SERVER_CONFIG_FILE}"

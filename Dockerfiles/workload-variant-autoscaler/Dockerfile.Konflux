@@ -1,0 +1,54 @@
+ARG BUILD_MODE=ODH
+
+ARG VERSION="0.5.1"
+ARG APP_BUILD_ROOT=/opt/app-root
+
+ARG BASE_IMAGE_ODH=registry.redhat.io/ubi9/go-toolset:9.7@sha256:82b82ecf4aedf67c4369849047c2680dba755fe57547bbb05eca211b22038e29
+ARG BASE_IMAGE_RHOAI=registry.redhat.io/ubi9/go-toolset:9.7@sha256:8b211cc8793d8013140844e8070aa584a8eb3e4e6e842ea4b03dd9914b1a5dc6
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG APP_BUILD_ROOT
+
+## strictfipsruntime does not work with disabling CGO, which is a best practice in this case
+# ENV GOEXPERIMENT=strictfipsruntime
+ENV APP_ROOT=$APP_BUILD_ROOT
+ENV GOPATH=$APP_ROOT
+
+WORKDIR $APP_ROOT/src/
+COPY go.mod ./
+COPY go.sum ./
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/ internal/
+COPY pkg/ pkg/
+RUN go mod download && \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ${APP_ROOT}/manager cmd/main.go
+
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi9/ubi-minimal@sha256:759f5f42d9d6ce2a705e290b7fc549e2d2cd39312c4fa345f93c02e4abb8da95
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1} AS deploy
+
+ARG VERSION
+ARG APP_BUILD_ROOT
+
+WORKDIR /
+COPY --from=builder ${APP_BUILD_ROOT}/manager .
+COPY LICENSE /licenses/license.txt
+USER 65532:65532
+
+ENTRYPOINT ["/manager"]
+# >>> [RHOAI] <<<
+
+LABEL com.redhat.component="odh-workload-variant-autoscaler-controller-rhel9" \
+      name="rhoai/odh-workload-variant-autoscaler-controller-rhel9" \
+      description="a Kubernetes controller that performs intelligent autoscaling for inference model servers based on saturation" \
+      summary="odh-workload-variant-autoscaler-controller" \
+      maintainer="['managed-open-data-hub@redhat.com']" \
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-workload-variant-autoscaler-controller" \
+      io.k8s.description="odh-workload-variant-autoscaler-controller" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"# >>> [END RHOAI] <<<

@@ -1,0 +1,55 @@
+###############################################################################
+#  Asynchronous Model-Sync Job image for Kubeflow Model Registry (https://github.com/kubeflow/model-registry/issues/1108)
+###############################################################################
+
+FROM registry.access.redhat.com/ubi9/python-312-minimal@sha256:8e3dceaff6954a958ecd730206ae6481814a04448fe78481960671d854834401 AS base
+
+USER 0
+
+# Install skopeo for Push/Pull of container images to integrate with Model Registry py client and Olot.
+RUN . /cachi2/cachi2.env && \
+     microdnf install -y skopeo gcc make python3.12-devel cargo g++ && \
+    microdnf clean all
+
+# security/env hardening
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on
+
+WORKDIR /app
+COPY ./poetry.lock ./pyproject.toml ./requirements.txt ./
+
+RUN python -m pip install -r requirements.txt --no-binary :all: \
+    && echo "Installation completed" \
+    && echo "Python path:" && python -c "import sys; print('\\n'.join(sys.path))" \
+    && echo "Installed packages:" \
+    && python -m pip list 
+
+# Copy application source
+COPY . .
+RUN ls -l /app
+
+# Switch to USER 1000
+RUN chown -R 1000:1000 /app
+USER 1000
+ENV PATH="/home/1000/.local/bin:$PATH"
+RUN ls -l /app
+
+# Sanity checks model_registry module import
+RUN echo "Testing model_registry import..." \
+&& python -c "import model_registry; print('model_registry package found')"
+
+# TODO: unavailble in OCI format: Add an explicit health-check (K8s will surface this in Pod.status)
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python -m job.healthcheck
+
+# The Job controller will pass CLI flags/ENV-vars described in issue #1108.
+ENTRYPOINT ["python", "-m", "job.entrypoint"]
+
+LABEL com.redhat.component="odh-model-registry-job-async-upload-rhel9" \
+      name="rhoai/odh-model-registry-job-async-upload-rhel9" \
+      description="K8s Job image that copies a model between storage back-ends and registers it in Kubeflow Model Registry." \
+      summary="K8s Job image that copies a model between storage back-ends and registers it in Kubeflow Model Registry." \
+      io.k8s.display-name="Model Registry Async-Upload Job" \
+      io.k8s.description="odh-kserve-localmodel-rhel9"

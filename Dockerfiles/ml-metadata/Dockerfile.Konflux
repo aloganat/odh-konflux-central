@@ -1,0 +1,104 @@
+ARG BUILD_MODE=ODH
+
+ARG BASE_IMAGE_ODH=registry.access.redhat.com/ubi9/ubi:latest
+ARG BASE_IMAGE_RHOAI=registry.access.redhat.com/ubi9/ubi:latest@sha256:05fa0100593c08b5e9dde684cd3eaa94b4d5d7b3cc09944f1f73924e49fde036
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS builder
+
+USER root
+
+RUN curl -o /etc/yum.repos.d/copr-galileo-bazel.repo \
+    https://copr.fedorainfracloud.org/coprs/galileo/bazel/repo/epel-9/galileo-bazel-epel-9.repo && \
+    dnf install -y \
+    which \
+    patch \
+    gcc \
+    clang \
+    cmake \
+    make \
+    openssl-devel \
+    libcurl-devel \
+    ca-certificates \
+    unzip \
+    git \
+    findutils \
+    python3 \
+    bazel5
+
+COPY . /mlmd-src
+WORKDIR /mlmd-src
+
+# >>> [ODH] <<<
+# Patch zetasql commit for UBI9 compatibility
+ENV PREVIOUS_ZETASQL_COMMIT ac37cf5c0d80b5605176fc0f29e87b12f00be693
+ENV PREVIOUS_ZETASQL_SHA 651a768cd51627f58aa6de7039aba9ddab22f4b0450521169800555269447840
+ENV CURRENT_ZETASQL_COMMIT f764f4e986ac1516ab5ae95e6d6ce2f4416cc6ff
+ENV CURRENT_ZETASQL_SHA 27e3d8bfd1f76918fc4d7a8f29646b8a0cdca567f921e0bff4a07f79448e92c0
+RUN \
+    sed -i "s/$PREVIOUS_ZETASQL_COMMIT/$CURRENT_ZETASQL_COMMIT/g" WORKSPACE && \
+    sed -i "s/$PREVIOUS_ZETASQL_SHA/$CURRENT_ZETASQL_SHA/g" WORKSPACE
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+ENV BAZEL_JOBS=8
+# >>> [END RHOAI] <<<
+
+RUN if [ "$BUILD_MODE" = "ODH" ]; then \
+      # Running in offline mode with --nofetch arg, cache and deps must be cloned ; \
+      # into the local root bazel cache ; \
+    fi
+# "-std=c++17" is needed in order to build with ZetaSQL.
+RUN bazel build -c opt --action_env=PATH \
+  --define=grpc_no_ares=true \
+  --copt="-Wno-maybe-uninitialized" \
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      --jobs=${BAZEL_JOBS} \ ; \
+    fi
+  //ml_metadata/metadata_store:metadata_store_server \
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      --cxxopt="-std=c++17" --host_cxxopt="-std=c++17" \ ; \
+      --verbose_failures ; \
+    else \
+      --cxxopt="-std=c++17" --host_cxxopt="-std=c++17" ; \
+    fi
+
+# copying libmysqlclient source onto THIRD_PARTY folder.
+RUN mkdir -p /mlmd-src/third_party
+RUN cp -RL /mlmd-src/bazel-mlmd-src/external/libmysqlclient /mlmd-src/third_party/mariadb-connector-c
+
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi9/ubi-minimal:latest
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1}
+
+COPY --from=builder /mlmd-src/bazel-bin/ml_metadata/metadata_store/metadata_store_server /bin/metadata_store_server
+COPY --from=builder /mlmd-src/third_party /mlmd-src/third_party
+
+ENV GRPC_PORT "8080"
+ENV METADATA_STORE_SERVER_CONFIG_FILE ""
+
+# Introduces tzdata package here to avoid LoadTimeZone check failed error in the metadata store server.
+RUN if [ "$BUILD_MODE" = "RHOAI" ]; then \
+      # https://access.redhat.com/solutions/5616681 ; \
+      microdnf reinstall tzdata -y && \ ; \
+    else \
+      microdnf reinstall -y tzdata && \ ; \
+    fi
+    microdnf clean all
+
+USER 65534:65534
+
+ENTRYPOINT \
+  "/bin/metadata_store_server" \
+  "--grpc_port=${GRPC_PORT}" \
+  "--metadata_store_server_config_file=${METADATA_STORE_SERVER_CONFIG_FILE}"
+# >>> [RHOAI] <<<
+
+LABEL com.redhat.component="odh-mlmd-grpc-server" \
+    name="odh-mlmd-grpc-server-rhel9" \
+    description="odh-mlmd-grpc-server" \
+    summary="odh-mlmd-grpc-server" \
+    io.openshift.expose-services="8080" \
+    io.openshift.tags="odh-mlmd-grpc-server" \
+    io.k8s.display-name="odh-mlmd-grpc-server" \
+    io.k8s.description="odh-mlmd-grpc-server"
+# >>> [END RHOAI] <<<
