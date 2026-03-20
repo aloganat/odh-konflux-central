@@ -100,7 +100,7 @@ flowchart TD
 
   subgraph op_block [Block 1 - Operator Build - CONDITIONAL]
     cloneOp["clone-operator-repo<br/>(when: snapshot-contains-operator!=true)"]
-    prefetchManifests["prefetch-manifests"]
+    prefetchManifests["prefetch-manifests<br/>(receives SNAPSHOT for image overrides)"]
     auditManifests["audit-manifests"]
     buildOp["build-operator-container"]
     applyTagsOp["apply-tags-operator"]
@@ -132,6 +132,7 @@ flowchart TD
   init_block --> snapshot_block
   snapshot_block --> op_block
   auditSnapshot --> cloneOp
+  genSnapshot -.->|SNAPSHOT| prefetchManifests
   pushMeta --> resolveOp
   resolveOp --> cloneBuildConfig
   bundle_block --> fbc_block
@@ -149,6 +150,7 @@ flowchart TD
 - **No inter-pipeline triggers**: `trigger-bundle-build` task is omitted. Sequencing is handled by `runAfter` within the e2e pipeline.
 - **Per-block finally logic**: Tasks that were in the `finally` section of individual pipelines (e.g., `push-build-metadata`, `show-sbom`, slack) are moved to the **end of their respective block** as regular tasks with appropriate `when` conditions, not to the far end of the e2e pipeline.
 - **Single platform**: Early-gate builds only for `linux/x86_64`. All three builds (operator, bundle, FBC) use `buildah-oci-ta` (non-matrix, single-arch) producing scalar `IMAGE_URL`/`IMAGE_DIGEST` results directly.
+- **SNAPSHOT-based operand image overrides**: The `prefetch-manifests` task receives the `SNAPSHOT` from `generate-snapshot`. After `operator-processor.py` resolves all operand images using `buildVersionTag` via Quay API, a post-processing step overlays real image URIs from the SNAPSHOT for any matching components. This ensures that when testing a group of PRs (e.g., dashboard + operator), the operator build embeds the freshly-built dashboard image rather than the stable-tagged one. Components not in the SNAPSHOT keep their `buildVersionTag`-resolved values. The task is a local copy (`e2e-early-gate/tasks/prefetch-operand-manifests-oci-ta.yaml`) of the upstream task with this override capability added.
 
 ### 2.4 Tasks to omit
 
@@ -215,6 +217,7 @@ clone-operator-repo
   └─ SOURCE_ARTIFACT_OP (operator source code)
 
 prefetch-manifests
+  ├─ input: SNAPSHOT from generate-snapshot (for operand image overrides)
   ├─ SOURCE_ARTIFACT_OP2 (operator source + fetched manifests)
   └─ CACHI2_ARTIFACT_OP (operands-map.yaml, manifests-config.yaml, prefetched-manifests/)
 
@@ -311,6 +314,49 @@ In the e2e pipeline:
 - It writes `catalog/v4.20/rhods-operator/catalog.yaml` to the workspace.
 - It also writes `catalog/catalog_build_args.map` which the FBC build reads via `build-args-file`.
 - The FBC build then builds from `catalog/v4.20` (with `path-context: catalog/v4.20`, `build-args-file: catalog/catalog_build_args.map`).
+
+### 3.7 SNAPSHOT-based operand image overrides in prefetch-manifests
+
+In the current flow, `prefetch-manifests` calls `operator-processor.py` which resolves ALL operand images from Quay using the `buildVersionTag` tag (e.g., `odh-stable`). This means every operand image embedded in the operator is the latest stable-tagged version.
+
+In the e2e early-gate flow, when testing a group of PRs (e.g., a dashboard PR alongside an operator PR), the freshly-built dashboard image from the SNAPSHOT should be used instead of the stable-tagged one. This is critical for correct end-to-end validation.
+
+**Approach**: The `prefetch-manifests` task is replaced with a local copy (`e2e-early-gate/tasks/prefetch-operand-manifests-oci-ta.yaml`) that adds a `SNAPSHOT` parameter. The override process:
+
+1. `operator-processor.py` runs first and resolves all images using `buildVersionTag` (unchanged behavior)
+2. If a non-empty `SNAPSHOT` is provided, a Python post-processing script (`apply_snapshot_overrides.py`) runs:
+   - Parses the SNAPSHOT JSON and builds a mapping from image repository (`quay.io/org/repo`) to full image URI (`quay.io/org/repo@sha256:...`)
+   - For each entry in `operands-map.yaml`, if its image repo matches a SNAPSHOT component, replaces the value with the SNAPSHOT's digest-based URI
+   - For each entry in `manifests-config.yaml`, if its `git.url` matches a SNAPSHOT component's `git.url`, updates `git.commit` to the SNAPSHOT's commit (and sets `ref_type` to `commit`) so manifest prefetching checks out the correct source revision
+3. The manifest prefetching loop then uses the (now-overridden) `manifests-config.yaml` to fetch the correct manifests
+
+**SNAPSHOT JSON format** (produced by `generate-snapshot`):
+```json
+{
+  "odh-dashboard": {
+    "image": "quay.io/opendatahub/odh-dashboard@sha256:abc123...",
+    "git.url": "https://github.com/opendatahub-io/odh-dashboard",
+    "git.commit": "def456..."
+  },
+  "data-science-pipelines-operator": {
+    "image": "quay.io/opendatahub/data-science-pipelines-operator@sha256:789ghi...",
+    "git.url": "https://github.com/opendatahub-io/data-science-pipelines-operator",
+    "git.commit": "jkl012..."
+  }
+}
+```
+
+**Matching logic**: Components are matched by comparing the image repository portion (before `@` or `:`) of the SNAPSHOT image with operands-map entry values. For manifests-config, matching is by `git.url`. This avoids the need for a name-mapping table between Konflux component names and operands-map entry names.
+
+**Edge cases**:
+- If `SNAPSHOT` is empty or `{}`, the override step is a no-op (all images use `buildVersionTag`)
+- If a SNAPSHOT component doesn't match any operands-map entry, it's silently skipped
+- The operator itself (`odh-operator-ci`) is never in the SNAPSHOT when `prefetch-manifests` runs (since the task is when-skipped when `snapshot-contains-operator=true`)
+
+**Files**:
+- Task: `e2e-early-gate/tasks/prefetch-operand-manifests-oci-ta.yaml`
+- Python override script (reference): `e2e-early-gate/tasks/scripts/apply_snapshot_overrides.py`
+- The same Python logic is embedded inline in the task YAML via a heredoc
 
 ---
 
@@ -1025,7 +1071,9 @@ Results: `SOURCE_ARTIFACT`, `url`, `commit`, `commit-timestamp`
 | Field | Value |
 |---|---|
 | runAfter | `clone-operator-repo` |
-| taskRef | git resolver: `red-hat-data-services/rhoai-konflux-tasks`, revision `odh`, path `konflux-tekton-tasks/prefetch-operand-manifests-oci-ta/0.1/prefetch-operand-manifests-oci-ta.yaml` |
+| taskRef | git resolver: `opendatahub-io/odh-konflux-central`, revision `earlygate`, path `e2e-early-gate/tasks/prefetch-operand-manifests-oci-ta.yaml` |
+
+**Note**: This task uses a local copy of the upstream `prefetch-operand-manifests-oci-ta` task with SNAPSHOT-based operand image override support added (see Section 3.7).
 
 Params:
 - `SOURCE_ARTIFACT` = `$(tasks.clone-operator-repo.results.SOURCE_ARTIFACT)`
@@ -1033,6 +1081,7 @@ Params:
 - `ociArtifactExpiresAfter` = `"1h"`
 - `utilsRepoBranch` = `$(params.utils-repo-branch)`
 - `buildVersionTag` = `$(params.build-version-tag)`
+- `SNAPSHOT` = `$(tasks.generate-snapshot.results.SNAPSHOT)`
 
 Workspaces: `git-basic-auth` = `git-auth`, `netrc` = `netrc`
 
@@ -1566,8 +1615,18 @@ These serve as reference copies. The actual changes must be applied via PR to th
 - [ ] Verify `fbc-processor.py -op extract-snapshot-images` and `-op catalog-patch` work with the paths
 - [ ] Verify skopeo/opm authentication works in the task container
 
+### Phase D2: SNAPSHOT-based operand image overrides in prefetch-manifests
+- [x] Create `e2e-early-gate/tasks/prefetch-operand-manifests-oci-ta.yaml` (local copy with SNAPSHOT support) per Section 3.7
+- [x] Create `e2e-early-gate/tasks/scripts/apply_snapshot_overrides.py` (reference Python script)
+- [x] Add `SNAPSHOT` param to the local prefetch task and wire it in the e2e pipeline
+- [x] Embed the override Python logic inline in the task YAML (heredoc)
+- [x] Update pipeline `prefetch-manifests` taskRef to point to local task
+- [ ] Test with a SNAPSHOT containing operand images to verify overrides are applied
+- [ ] Verify that empty SNAPSHOT (no group components besides operator) is a no-op
+- [ ] Verify manifests-config.yaml git.commit overrides result in correct manifest prefetching
+
 ### Phase E: E2E pipeline assembly
-- [ ] Create `e2e-early-gate/early-gate-e2e-pipeline.yaml` per Section 6
+- [x] Create `e2e-early-gate/early-gate-e2e-pipeline.yaml` per Section 6
 - [ ] Wire all 17 tasks with correct runAfter, when, params, taskRefs
 - [ ] Validate pipeline YAML with `tkn pipeline lint` or equivalent
 - [ ] Verify no dangling references to removed tasks (build-image-index, etc.)
@@ -1596,10 +1655,12 @@ These serve as reference copies. The actual changes must be applied via PR to th
 | File | Status | Description |
 |---|---|---|
 | `e2e-early-gate/E2E-EARLY-GATE-PLAN.md` | This file | Comprehensive executable plan |
-| `e2e-early-gate/tasks/bundle-processor.yaml` | To create | Tekton task replacing bundle-processor workflow |
-| `e2e-early-gate/tasks/fbc-processor.yaml` | To create | Tekton task replacing fbc-processor workflow |
-| `e2e-early-gate/early-gate-e2e-pipeline.yaml` | To create | E2E Tekton Pipeline |
-| `e2e-early-gate/early-gate-e2e-pipelinerun.yaml` | To create | PipelineRun for the e2e pipeline |
+| `e2e-early-gate/tasks/bundle-processor.yaml` | Created | Tekton task replacing bundle-processor workflow |
+| `e2e-early-gate/tasks/fbc-processor.yaml` | Created | Tekton task replacing fbc-processor workflow |
+| `e2e-early-gate/tasks/prefetch-operand-manifests-oci-ta.yaml` | Created | Local copy of prefetch task with SNAPSHOT override support (see Section 3.7) |
+| `e2e-early-gate/tasks/scripts/apply_snapshot_overrides.py` | Created | Reference Python script for overlaying SNAPSHOT images onto operands-map.yaml |
+| `e2e-early-gate/early-gate-e2e-pipeline.yaml` | Created | E2E Tekton Pipeline |
+| `e2e-early-gate/early-gate-e2e-pipelinerun.yaml` | Created | PipelineRun for the e2e pipeline |
 | `e2e-early-gate/repos/ODH-Build-Config/.github/workflows/process-operator-bundle.yaml` | Optional | Modified workflow with early-gate guard |
 | `e2e-early-gate/repos/ODH-Build-Config/.github/workflows/process-fbc-fragment.yaml` | Optional | Modified workflow with early-gate guard |
 

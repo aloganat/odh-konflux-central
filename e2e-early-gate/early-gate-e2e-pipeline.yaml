@@ -360,15 +360,17 @@ spec:
       value: $(params.utils-repo-branch)
     - name: buildVersionTag
       value: $(params.build-version-tag)
+    - name: SNAPSHOT
+      value: $(tasks.generate-snapshot.results.SNAPSHOT)
     taskRef:
       resolver: git
       params:
       - name: url
-        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
       - name: revision
-        value: "odh"
+        value: earlygate
       - name: pathInRepo
-        value: "konflux-tekton-tasks/prefetch-operand-manifests-oci-ta/0.1/prefetch-operand-manifests-oci-ta.yaml"
+        value: e2e-early-gate/tasks/prefetch-operand-manifests-oci-ta.yaml
     when:
     - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
       operator: notin
