@@ -228,7 +228,7 @@ spec:
               TRACER=./tracer.sh ./tracer-diff.sh --mode 2 --only-changes "--odh --digest $PREVIOUS_NIGHTLY_SHA" "--odh -i $LATEST_CATALOG_CI_IMAGE"   | tee tracer-diff.txt
               SUBST_VARS='$LATEST_CATALOG_CI_IMAGE $LATEST_BUILD_METADATA_URL $BUILD_URL'
               slack_message=$(echo "$MESSAGE_TEMPLATE" | envsubst "$SUBST_VARS")
-              ./send-slack-message.sh -c "$CHANNEL" -m "$slack_message" -m "$(cat tracer-diff.txt)" -f tracer-output.txt --emit-thread | tr -d '\n' | tee "$(results.thread-id.path)"
+              ./send-slack-message.sh -c "$CHANNEL" -m "$slack_message" -m "*Comparison with Previous Nightly*" -m "$(cat tracer-diff.txt)" -f tracer-output.txt --emit-thread | tr -d '\n' | tee "$(results.thread-id.path)"
       - name: trigger-nightly-tests
         description: trigger nightly tests
         when:
