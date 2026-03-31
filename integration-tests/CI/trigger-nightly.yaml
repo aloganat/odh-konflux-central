@@ -251,6 +251,11 @@ spec:
                 secretKeyRef:
                   name: rhods-ci
                   key: secret
+            - name: CHANNEL
+              valueFrom:
+                configMapKeyRef:
+                  name: slack-config
+                  key: odh-notification-channel
             script: |
               #!/bin/bash
               set -e
@@ -267,7 +272,7 @@ spec:
               -H "Accept: application/vnd.github.v3+json" \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Content-Type: application/json" \
-              -d '{ "ref": "main", "inputs": { "target_branch": "'"$TARGET"'", "thread_id": "'"$THREAD_ID"'" } }'
+              -d '{ "ref": "main", "inputs": { "target_branch": "'"$TARGET"'", "thread_id": "'"$THREAD_ID"'", "channel_id": "'"$CHANNEL"'"} }'
     workspaces:
     - name: data
       optional: false
