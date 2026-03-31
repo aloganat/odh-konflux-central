@@ -1,7 +1,7 @@
-# feature-server - Fixed
+# llm-d-inference-scheduler - Fixed
 
 ## Status
-✓ Fixed using corrected Dockerfile path for RHOAI
+✓ Fixed using corrected Dockerfile path for ODH
 
 ## Files
 - `Dockerfile.ODH` - ODH version
@@ -9,5 +9,5 @@
 - `Dockerfile.Konflux` - Merged version
 
 ## Note
-This component was fixed after the initial merge by downloading the RHOAI
+This component was fixed after the initial merge by downloading the ODH
 Dockerfile with the corrected path.

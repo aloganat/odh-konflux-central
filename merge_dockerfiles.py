@@ -11,6 +11,7 @@ import os
 import re
 import ssl
 import sys
+import json
 import difflib
 import textwrap
 import urllib.request
@@ -189,6 +190,29 @@ def _enrich(ci: ComponentInfo):
     # Strip version suffix like -v3-4
     n = re.sub(r"-v\d+-\d+$", "", n)
     ci.norm_name = n
+
+
+# ---------------------------------------------------------------------------
+# Path Corrections
+# ---------------------------------------------------------------------------
+
+def load_path_corrections() -> dict:
+    """Load path corrections from JSON file."""
+    corrections_file = WORKSPACE / "dockerfile_path_corrections.json"
+    if corrections_file.exists():
+        with open(corrections_file) as f:
+            return json.load(f)
+    return {"odh_corrections": {}, "rhoai_corrections": {}, "exclude_components": {}}
+
+
+def apply_corrections(component: ComponentInfo, corrections: dict, side: str) -> ComponentInfo:
+    """Apply path corrections to a component."""
+    correction_key = f"{side}_corrections"
+    if component.name in corrections.get(correction_key, {}):
+        correction = corrections[correction_key][component.name]
+        component.dockerfile_url = correction["dockerfileUrl"]
+        print(f"  ⚠️  Applied correction for {component.name}: {correction['reason']}")
+    return component
 
 
 # ---------------------------------------------------------------------------
@@ -782,6 +806,26 @@ def main():
     rhoai_components = parse_rhoai_yaml(RHOAI_YAML)
     print(f"  ODH components:  {len(odh_components)}")
     print(f"  RHOAI components: {len(rhoai_components)}")
+
+    # Apply path corrections
+    print("\n[Phase 1.5] Applying path corrections...")
+    corrections = load_path_corrections()
+
+    odh_components = [apply_corrections(c, corrections, "odh") for c in odh_components]
+    rhoai_components = [apply_corrections(c, corrections, "rhoai") for c in rhoai_components]
+
+    # Filter out excluded components
+    excluded = corrections.get("exclude_components", {})
+    if excluded:
+        print(f"  Excluding {len(excluded)} component(s):")
+        for name, reason in excluded.items():
+            print(f"    - {name}: {reason}")
+
+    odh_components = [c for c in odh_components if c.name not in excluded]
+    rhoai_components = [c for c in rhoai_components if c.name not in excluded]
+
+    print(f"  ODH components after filtering:  {len(odh_components)}")
+    print(f"  RHOAI components after filtering: {len(rhoai_components)}")
 
     # Phase 2
     print("\n[Phase 2] Correlating components...")
