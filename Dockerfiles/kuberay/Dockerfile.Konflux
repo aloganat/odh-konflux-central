@@ -1,0 +1,68 @@
+ARG BUILD_MODE=ODH
+
+ARG BASE_IMAGE_ODH=golang:1.24.2-bullseye
+ARG BASE_IMAGE_RHOAI=registry.access.redhat.com/ubi9/go-toolset@sha256:0f4f6f7868962aa75dddfe4230b664bdf77071e92c43c70c824c58450e37693f
+ARG BASE_IMAGE=${BASE_IMAGE_${BUILD_MODE}}
+FROM ${BASE_IMAGE} AS builder
+
+# >>> [RHOAI] <<<
+FROM registry.access.redhat.com/ubi9/go-toolset@sha256:0f4f6f7868962aa75dddfe4230b664bdf77071e92c43c70c824c58450e37693f AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+# >>> [END RHOAI] <<<
+
+WORKDIR /workspace
+# >>> [ODH] <<<
+# Copy the Go Modules manifests
+# >>> [END ODH] <<<
+# >>> [RHOAI] <<<
+USER root
+
+# >>> [END RHOAI] <<<
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
+
+# Copy the go source
+COPY main.go main.go
+COPY apis/ apis/
+COPY controllers/ controllers/
+COPY pkg/features pkg/features
+COPY pkg/utils pkg/utils
+COPY pkg/webhooks pkg/webhooks
+
+# Build
+USER root
+RUN if [ "$BUILD_MODE" = "ODH" ]; then \
+      CGO_ENABLED=1 GOOS=linux GO111MODULE=on go build -tags strictfipsruntime -a -o manager main.go ; \
+    fi
+
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi9/ubi:latest
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1}
+
+ARG BASE_IMAGE_1_ODH=registry.access.redhat.com/ubi9/ubi:latest
+ARG BASE_IMAGE_1_RHOAI=registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+ARG BASE_IMAGE_1=${BASE_IMAGE_1_${BUILD_MODE}}
+FROM ${BASE_IMAGE_1}
+
+WORKDIR /
+COPY --from=builder /workspace/manager .
+USER 65532:65532
+
+ENTRYPOINT ["/manager"]
+# >>> [RHOAI] <<<
+LABEL com.redhat.component="odh-kuberay-operator-controller-container" \
+      name="managed-open-data-hub/odh-kuberay-operator-controller-container-rhel8" \
+      description="Manages lifecycle of RayClusters, RayJobs, RayServices and associated Kubernetes resources" \
+      summary="odh-kuberay-operator-controller-container" \
+      maintainer="['managed-open-data-hub@redhat.com']" \
+      io.openshift.expose-services="" \
+      io.k8s.display-name="odh-kuberay-operator-controller-container" \
+      io.k8s.description="odh-kuberay-operator-controller" \
+      com.redhat.license_terms="https://www.redhat.com/licenses/Red_Hat_Standard_EULA_20191108.pdf"
+# >>> [END RHOAI] <<<

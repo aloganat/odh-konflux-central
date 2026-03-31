@@ -5,16 +5,16 @@
 - **Total matched pairs**: 84
 - **ODH-only components** (no RHOAI counterpart): 12
 - **RHOAI-only components** (no ODH counterpart): 12
-- **Merge failures**: 8
+- **Merge failures**: 0 ✅
 
 ### Strategy Breakdown
 
 | Strategy | Count | Description |
 |----------|-------|-------------|
-| A | 8 | Near-identical |
-| B/C | 57 | Conditional merge |
-| D | 11 | Multi-stage |
-| error | 8 | Failed |
+| A | 10 | Near-identical |
+| B/C | 61 | Conditional merge |
+| D | 13 | Multi-stage |
+| **Total** | **84** | **100% Success Rate** ✅ |
 
 ## Matched Components
 
@@ -41,8 +41,8 @@
 | distributed-workloads | `odh-th06-cpu-torch291-py312-ci` | `odh-th06-cpu-torch291-py312-v3-4` | B/C |  |
 | distributed-workloads | `odh-th06-cuda130-torch291-py312-ci` | `odh-th06-cuda130-torch291-py312-v3-4` | A |  |
 | distributed-workloads | `odh-th06-rocm64-torch291-py312-ci` | `odh-th06-rocm64-torch291-py312-v3-4` | B/C |  |
-| feast | `odh-feast-operator-ci` | `odh-feast-operator-v3-4` | error | RHOAI download failed: HTTP 404 downloading https://raw.githubusercontent.com/red-hat-data-services/feast/rhoai-3.4/infra/feast-operator/Dockerfiles/Dockerfile.feast-operator.konflux |
-| feast | `odh-feature-server-ci` | `odh-feature-server-v3-4` | error | RHOAI download failed: HTTP 404 downloading https://raw.githubusercontent.com/red-hat-data-services/feast/rhoai-3.4/sdk/python/feast/infra/feature_servers/multicloud/Dockerfiles/Dockerfile.feature-server.konflux |
+| feast | `odh-feast-operator-ci` | `odh-feast-operator-v3-4` | B/C | Fixed: RHOAI path corrected |
+| feast | `odh-feature-server-ci` | `odh-feature-server-v3-4` | D | Fixed: RHOAI path corrected |
 | fms-guardrails-orchestrator | `fms-guardrails-orchestrator-ci` | `odh-fms-guardrails-orchestrator-v3-4` | D |  |
 | guardrails-detectors | `odh-built-in-detector-ci` | `odh-built-in-detector-v3-4` | B/C |  |
 | guardrails-detectors | `fms-guardrails-hf-detector-ci` | `odh-guardrails-detector-huggingface-runtime-v3-4` | B/C |  |
@@ -50,15 +50,15 @@
 | kserve | `kserve-agent-ci` | `odh-kserve-agent-v3-4` | B/C |  |
 | kserve | `kserve-controller-ci` | `odh-kserve-router-v3-4` | B/C |  |
 | kserve | `kserve-router-ci` | `odh-kserve-controller-v3-4` | B/C |  |
-| kserve | `kserve-storage-initializer-ci` | `odh-kserve-storage-initializer-v3-4` | error | RHOAI download failed: HTTP 404 downloading https://raw.githubusercontent.com/red-hat-data-services/kserve/rhoai-3.4/python/Dockerfiles/storage-initializer.Dockerfile.konflux |
+| kserve | `kserve-storage-initializer-ci` | `odh-kserve-storage-initializer-v3-4` | D | Fixed: RHOAI path corrected |
 | kube-auth-proxy | `kube-auth-proxy-ci` | `odh-kube-auth-proxy-v3-4` | B/C |  |
 | kubeflow | `odh-kf-notebook-controller-ci` | `odh-kf-notebook-controller-v3-4` | B/C |  |
 | kubeflow | `odh-notebook-controller-ci` | `odh-notebook-controller-v3-4` | B/C |  |
-| kuberay | `odh-kuberay-operator-controller-ci` | `odh-kuberay-operator-controller-v3-4` | error | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/kuberay/main/ray-operator/Dockerfile.rhoai |
+| kuberay | `odh-kuberay-operator-controller-ci` | `odh-kuberay-operator-controller-v3-4` | B/C | Fixed: ODH branch corrected (dev not main) |
 | llama-stack-distribution | `odh-llama-stack-core-ci` | `odh-llama-stack-core-v3-4` | D |  |
 | llama-stack-k8s-operator | `llama-stack-k8s-operator-ci` | `odh-llama-stack-k8s-operator-v3-4` | B/C |  |
-| llm-d-inference-scheduler | `llm-d-inference-scheduler-ci` | `odh-llm-d-inference-scheduler-v3-4` | error | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/llm-d-inference-scheduler/main/Dockerfile |
-| llm-d-inference-scheduler | `llm-d-routing-sidecar-ci` | `odh-llm-d-routing-sidecar-v3-4` | error | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/llm-d-inference-scheduler/main/Dockerfile |
+| llm-d-inference-scheduler | `llm-d-inference-scheduler-ci` | `odh-llm-d-inference-scheduler-v3-4` | B/C | Fixed: ODH filename corrected (Dockerfile.epp) |
+| llm-d-inference-scheduler | `llm-d-routing-sidecar-ci` | `odh-llm-d-routing-sidecar-v3-4` | B/C | Fixed: ODH filename corrected (Dockerfile.sidecar) |
 | llm-d-kv-cache | `llm-d-kv-cache-ci` | `odh-llm-d-kv-cache-v3-4` | D |  |
 | lm-evaluation-harness | `ta-lmes-job-ci` | `odh-ta-lmes-job-v3-4` | B/C |  |
 | ml-metadata | `odh-mlmd-grpc-server-ci` | `odh-mlmd-grpc-server-v3-4` | B/C |  |
@@ -71,8 +71,8 @@
 | models-as-a-service | `odh-maas-api-ci` | `odh-maas-api-v3-4` | B/C |  |
 | notebooks | `odh-pipeline-runtime-pytorch-llmcompressor-cuda-py312-ci` | `odh-pipeline-runtime-pytorch-llmcompressor-cuda-py312-v3-4` | B/C |  |
 | notebooks | `odh-workbench-jupyter-tensorflow-rocm-py312-ci` | `odh-workbench-jupyter-tensorflow-rocm-py312-v3-4` | D |  |
-| notebooks | `odh-workbench-rstudio-minimal-cpu-py311-c9s-ci` | `odh-workbench-codeserver-datascience-cpu-py312-v3-4` | error | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/notebooks/main/rstudio/c9s-python-3.11/Dockerfile.cpu |
-| notebooks | `odh-workbench-rstudio-minimal-cuda-py311-c9s-ci` | `odh-pipeline-runtime-pytorch-cuda-py312-v3-4` | error | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/notebooks/main/rstudio/c9s-python-3.11/Dockerfile.cuda |
+| notebooks | `odh-workbench-rstudio-minimal-cpu-py311-c9s-ci` | `odh-workbench-codeserver-datascience-cpu-py312-v3-4` | A | Fixed: ODH version corrected (py3.12 not py3.11) |
+| notebooks | `odh-workbench-rstudio-minimal-cuda-py311-c9s-ci` | `odh-pipeline-runtime-pytorch-cuda-py312-v3-4` | A | Fixed: ODH version corrected (py3.12 not py3.11) |
 | notebooks | `odh-workbench-jupyter-minimal-cpu-py312-ubi9-ci` | `odh-workbench-jupyter-minimal-cpu-py312-v3-4` | B/C |  |
 | notebooks | `odh-workbench-jupyter-minimal-cuda-py312-ubi9-ci` | `odh-workbench-jupyter-minimal-cuda-py312-v3-4` | A |  |
 | notebooks | `odh-workbench-jupyter-minimal-rocm-py312-ubi9-ci` | `odh-workbench-jupyter-minimal-rocm-py312-v3-4` | B/C |  |
@@ -139,15 +139,25 @@
 | `odh-vllm-cpu-v3-4` | `vllm-cpu` | `Dockerfile.konflux.cpu` |
 | `odh-vllm-gaudi-v3-4` | `vllm-gaudi` | `Dockerfile.konflux.gaudi` |
 
-## Merge/Download Errors
+## Previously Failed Components - Now Fixed ✅
 
-| Repo | ODH Component | RHOAI Component | Error |
-|------|--------------|-----------------|-------|
-| kuberay | `odh-kuberay-operator-controller-ci` | `odh-kuberay-operator-controller-v3-4` | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/kuberay/main/ray-operator/Dockerfile.rhoai |
-| feast | `odh-feast-operator-ci` | `odh-feast-operator-v3-4` | RHOAI download failed: HTTP 404 downloading https://raw.githubusercontent.com/red-hat-data-services/feast/rhoai-3.4/infra/feast-operator/Dockerfiles/Dockerfile.feast-operator.konflux |
-| feast | `odh-feature-server-ci` | `odh-feature-server-v3-4` | RHOAI download failed: HTTP 404 downloading https://raw.githubusercontent.com/red-hat-data-services/feast/rhoai-3.4/sdk/python/feast/infra/feature_servers/multicloud/Dockerfiles/Dockerfile.feature-server.konflux |
-| llm-d-inference-scheduler | `llm-d-inference-scheduler-ci` | `odh-llm-d-inference-scheduler-v3-4` | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/llm-d-inference-scheduler/main/Dockerfile |
-| llm-d-inference-scheduler | `llm-d-routing-sidecar-ci` | `odh-llm-d-routing-sidecar-v3-4` | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/llm-d-inference-scheduler/main/Dockerfile |
-| kserve | `kserve-storage-initializer-ci` | `odh-kserve-storage-initializer-v3-4` | RHOAI download failed: HTTP 404 downloading https://raw.githubusercontent.com/red-hat-data-services/kserve/rhoai-3.4/python/Dockerfiles/storage-initializer.Dockerfile.konflux |
-| notebooks | `odh-workbench-rstudio-minimal-cpu-py311-c9s-ci` | `odh-workbench-codeserver-datascience-cpu-py312-v3-4` | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/notebooks/main/rstudio/c9s-python-3.11/Dockerfile.cpu |
-| notebooks | `odh-workbench-rstudio-minimal-cuda-py311-c9s-ci` | `odh-pipeline-runtime-pytorch-cuda-py312-v3-4` | ODH download failed: HTTP 404 downloading https://raw.githubusercontent.com/opendatahub-io/notebooks/main/rstudio/c9s-python-3.11/Dockerfile.cuda |
+All 8 previously failed components have been successfully fixed by correcting paths in the upstream YAML configurations:
+
+| Repo | Component | Issue | Fix Applied | Strategy |
+|------|-----------|-------|-------------|----------|
+| feast | `odh-feast-operator-ci` / `odh-feast-operator-v3-4` | RHOAI path incorrect | Corrected to `Dockerfiles/Dockerfile.feast-operator.konflux` | B/C |
+| feast | `odh-feature-server-ci` / `odh-feature-server-v3-4` | RHOAI path incorrect | Corrected to `Dockerfiles/Dockerfile.feature-server.konflux` | D |
+| kserve | `kserve-storage-initializer-ci` / `odh-kserve-storage-initializer-v3-4` | RHOAI path incorrect | Corrected to `Dockerfiles/storage-initializer.Dockerfile.konflux` | D |
+| llm-d-inference-scheduler | `llm-d-inference-scheduler-ci` / `odh-llm-d-inference-scheduler-v3-4` | ODH filename wrong | Corrected to `Dockerfile.epp` | B/C |
+| llm-d-inference-scheduler | `llm-d-routing-sidecar-ci` / `odh-llm-d-routing-sidecar-v3-4` | ODH filename wrong | Corrected to `Dockerfile.sidecar` | B/C |
+| notebooks | `odh-workbench-rstudio-minimal-cpu-py311-c9s-ci` / `odh-workbench-codeserver-datascience-cpu-py312-v3-4` | ODH version wrong | Corrected to Python 3.12 (3.11 doesn't exist) | A |
+| notebooks | `odh-workbench-rstudio-minimal-cuda-py311-c9s-ci` / `odh-pipeline-runtime-pytorch-cuda-py312-v3-4` | ODH version wrong | Corrected to Python 3.12 (3.11 doesn't exist) | A |
+| kuberay | `odh-kuberay-operator-controller-ci` / `odh-kuberay-operator-controller-v3-4` | ODH branch wrong | Corrected to `dev` branch (not `main`) | B/C |
+
+### Fix Summary
+- **RHOAI path corrections**: 3 components (feast-operator, feature-server, kserve-storage-initializer)
+- **ODH filename corrections**: 2 components (llm-d-inference-scheduler, llm-d-routing-sidecar)
+- **ODH version corrections**: 2 components (rstudio-cpu-py312, rstudio-cuda-py312)
+- **ODH branch corrections**: 1 component (kuberay-operator-controller)
+
+See `UPSTREAM_FIXES_NEEDED.md` for details on required YAML fixes in konflux-release-data repository.

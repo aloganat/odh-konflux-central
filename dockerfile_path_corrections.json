@@ -1,0 +1,40 @@
+{
+  "rhoai_corrections": {
+    "odh-feast-operator-v3-4": {
+      "dockerfileUrl": "Dockerfiles/Dockerfile.feast-operator.konflux",
+      "reason": "Remove infra/feast-operator/ prefix - file is at root"
+    },
+    "odh-feature-server-v3-4": {
+      "dockerfileUrl": "Dockerfiles/Dockerfile.feature-server.konflux",
+      "reason": "Remove nested SDK path - file is at root"
+    },
+    "odh-kserve-storage-initializer-v3-4": {
+      "dockerfileUrl": "Dockerfiles/storage-initializer.Dockerfile.konflux",
+      "reason": "Remove python/ prefix"
+    }
+  },
+  "odh_corrections": {
+    "llm-d-inference-scheduler-ci": {
+      "dockerfileUrl": "Dockerfile.epp",
+      "reason": "Generic Dockerfile doesn't exist - use Dockerfile.epp"
+    },
+    "llm-d-routing-sidecar-ci": {
+      "dockerfileUrl": "Dockerfile.sidecar",
+      "reason": "Generic Dockerfile doesn't exist - use Dockerfile.sidecar"
+    },
+    "odh-workbench-rstudio-minimal-cpu-py311-c9s-ci": {
+      "dockerfileUrl": "rstudio/c9s-python-3.12/Dockerfile.cpu",
+      "reason": "Python 3.11 version doesn't exist - use 3.12"
+    },
+    "odh-workbench-rstudio-minimal-cuda-py311-c9s-ci": {
+      "dockerfileUrl": "rstudio/c9s-python-3.12/Dockerfile.cuda",
+      "reason": "Python 3.11 version doesn't exist - use 3.12"
+    }
+  },
+  "odh_branch_corrections": {
+    "odh-kuberay-operator-controller-ci": {
+      "revision": "dev",
+      "reason": "Repository default branch is dev, not main"
+    }
+  }
+}
