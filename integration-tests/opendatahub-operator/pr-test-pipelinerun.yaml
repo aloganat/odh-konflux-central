@@ -19,6 +19,22 @@ spec:
       - name: BUILD_TYPE
         type: string
         default: "CI"
+      - name: repo-owner
+        type: string
+        default: "opendatahub-io"
+        description: "Owner of the FBC processor repository"
+      - name: repo-name
+        type: string
+        default: "opendatahub-operator"
+        description: "Name of the FBC processor repository"
+      - name: fbc-workflow
+        type: string
+        default: "release-process-fbc-fragment.yaml"
+        description: "GitHub Actions workflow file to trigger"
+      - name: fbc-enabled
+        type: string
+        default: "true"
+        description: "Whether to trigger FBC processing after successful E2E"
     tasks:
       - name: parse-metadata
         taskRef:
@@ -308,3 +324,82 @@ spec:
           - input: "$(tasks.check-prerequisites.results.prerequisites-met)"
             operator: in
             values: ["true"]
+
+    finally:
+      - name: trigger-fbc-processor
+        when:
+          - input: "$(tasks.status)"
+            operator: in
+            values: ["Succeeded"]
+          - input: "$(params.BUILD_TYPE)"
+            operator: in
+            values: ["Release"]
+          - input: "$(params.fbc-enabled)"
+            operator: in
+            values: ["true"]
+        params:
+          - name: release-branch
+            value: "$(tasks.parse-metadata.results.target-git-branch)"
+          - name: build-commit
+            value: "$(tasks.parse-metadata.results.source-git-revision)"
+          - name: pr-number
+            value: "$(tasks.parse-metadata.results.pull-request-number)"
+          - name: component-image
+            value: "$(tasks.parse-metadata.results.component-container-image)"
+          - name: test-event-type
+            value: "$(tasks.parse-metadata.results.test-event-type)"
+        taskSpec:
+          params:
+            - name: release-branch
+            - name: build-commit
+            - name: pr-number
+            - name: component-image
+            - name: test-event-type
+          steps:
+            - name: trigger-fbc-workflow
+              image: quay.io/rhoai/rhoai-task-toolset:its
+              env:
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: rhods-ci
+                      key: secret
+                - name: FBC_REPO_OWNER
+                  value: "$(params.repo-owner)"
+                - name: FBC_REPO_NAME
+                  value: "$(params.repo-name)"
+                - name: FBC_WORKFLOW_FILE
+                  value: "$(params.fbc-workflow)"
+              script: |
+                #!/bin/bash
+                set -e
+
+                # For Release builds, use the release branch (e.g., odh-3.4.0)
+                TARGET_REF="$(params.release-branch)"
+
+                echo "Triggering FBC processor workflow for successful E2E completion"
+                echo "Repository: $FBC_REPO_OWNER/$FBC_REPO_NAME"
+                echo "Workflow: $FBC_WORKFLOW_FILE"
+                echo "Target ref: $TARGET_REF"
+                echo "Build type: Release"
+                echo "Release branch: $(params.release-branch)"
+                echo "Build commit: $(params.build-commit)"
+
+                # Validate that target ref follows ODH release pattern
+                if [[ ! "$TARGET_REF" =~ ^odh-[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+                  echo "WARNING: Target ref '$TARGET_REF' does not match ODH release pattern (odh-x.y.z)"
+                  echo "FBC processor workflow requires branches starting with 'odh-' and will not run otherwise"
+                  exit 0
+                fi
+
+                curl -f -X POST "https://api.github.com/repos/$FBC_REPO_OWNER/$FBC_REPO_NAME/actions/workflows/$FBC_WORKFLOW_FILE/dispatches" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  -H "Authorization: Bearer $GITHUB_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"ref\": \"$TARGET_REF\"}" || {
+                    echo "WARNING: Failed to trigger FBC processor workflow, but continuing pipeline"
+                    echo "This may be due to network issues or insufficient permissions"
+                    exit 0
+                  }
+
+                echo "FBC processor workflow triggered successfully on branch: $TARGET_REF"
