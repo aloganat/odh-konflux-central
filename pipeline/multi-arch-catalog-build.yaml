@@ -525,8 +525,23 @@ spec:
 
           tracer.sh --odh -i "$IMAGE_REF" --show-commits | tee tracer-output.txt
 
+          IMAGE_REPO="${IMAGE_REF%%:*}"
+          NIGHTLY_IMAGE="${IMAGE_REPO}:odh-stable-nightly"
+          NIGHTLY_SHA=$(skopeo inspect --raw "docker://$NIGHTLY_IMAGE" 2>/dev/null | sha256sum | awk '{print "sha256:" $1}' || true)
+
+          DIFF_ARGS=()
+          if [ -n "$NIGHTLY_SHA" ]; then
+            tracer-diff.sh --mode 2 --only-changes \
+              --old-label "latest nightly" --new-label "this ci build" \
+              "--odh --digest $NIGHTLY_SHA" "--odh -i $IMAGE_REF" \
+                | tee tracer-diff.txt
+            DIFF_ARGS=(-m "$(cat tracer-diff.txt)")
+          else
+            echo "No previous nightly found, skipping diff"
+          fi
+
           SLACK_RC=0
-          OUTPUT=$(send-slack-message.sh -c "$CHANNEL" -m "$slack_message" -f tracer-output.txt -v 2>&1) || SLACK_RC=$?
+          OUTPUT=$(send-slack-message.sh -c "$CHANNEL" -m "$slack_message" "${DIFF_ARGS[@]}" -f tracer-output.txt -v 2>&1) || SLACK_RC=$?
 
           THREAD_TS=$(printf '%s\n' "$OUTPUT" | grep -oP 'Setting new thread id:\s*\K[0-9]+\.[0-9]+' | head -1 || true)
 
