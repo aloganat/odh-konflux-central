@@ -30,6 +30,10 @@ spec:
         name: TRIGGER_NIGHTLY_TAG
         type: string
         default: "true"
+      - description: Override the Slack channel from the configmap
+        name: OVERRIDE_CHANNEL
+        type: string
+        default: ""
     tasks:
       - name: choose-ci-build
         description: selects the latest ci build to promote to nightly
@@ -212,6 +216,8 @@ spec:
                 configMapKeyRef:
                   name: slack-config
                   key: odh-notification-channel
+            - name: OVERRIDE_CHANNEL
+              value: $(params.OVERRIDE_CHANNEL)
             - name: MESSAGE_TEMPLATE
               valueFrom:
                 configMapKeyRef:
@@ -221,6 +227,10 @@ spec:
             script: |
               #!/bin/bash
               set -eo pipefail
+
+              if [ -n "$OVERRIDE_CHANNEL" ]; then
+                CHANNEL="$OVERRIDE_CHANNEL"
+              fi
 
               tracer.sh --odh -i "$LATEST_CATALOG_CI_IMAGE" --show-commits | tee tracer-output.txt
 
@@ -286,9 +296,15 @@ spec:
                 configMapKeyRef:
                   name: slack-config
                   key: odh-notification-channel
+            - name: OVERRIDE_CHANNEL
+              value: $(params.OVERRIDE_CHANNEL)
             script: |
               #!/bin/bash
               set -e
+
+              if [ -n "$OVERRIDE_CHANNEL" ]; then
+                CHANNEL="$OVERRIDE_CHANNEL"
+              fi
 
               TARGET=odh-stable
 
