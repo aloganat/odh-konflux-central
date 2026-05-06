@@ -155,7 +155,6 @@ spec:
         echo "Using operator component name from label: ${ODH_OPERATOR_COMPONENT_NAME}"
       fi
 
-
       # Install dependencies
       os="$(uname -s | tr '[:upper:]' '[:lower:]')"
       arch="$(uname -m | sed 's/x86_64/amd64/')"
@@ -245,8 +244,9 @@ spec:
               return
 
           with open(args.operands_map) as f:
-              operands_map = yaml_handler.load(f)
+              operands_map_data = yaml_handler.load(f)
           count = 0
+          operands_map = operands_map_data.get("relatedImages", []) if operands_map_data else []
           if operands_map:
               for entry in operands_map:
                   value = str(entry.get("value", ""))
@@ -256,7 +256,7 @@ spec:
                       entry["value"] = repo_to_image[entry_repo]
                       count += 1
           with open(args.operands_map, "w") as f:
-              yaml_handler.dump(operands_map, f)
+              yaml_handler.dump(operands_map_data, f)
           print(f"Applied {count} SNAPSHOT override(s) to operands-map.yaml")
 
           if args.manifests_config and git_url_to_info:
