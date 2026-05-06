@@ -584,6 +584,10 @@ spec:
       operator: notin
       values:
       - "true"
+    - input: $(params.pipeline-type)
+      operator: notin
+      values:
+      - "pull-request"
     workspaces:
     - name: basic-auth
       workspace: git-auth
