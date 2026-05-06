@@ -60,6 +60,12 @@ spec:
       override the ones resolved via buildVersionTag. Empty string means no overrides.
     type: string
     default: ""
+  - name: operatorComponentName
+    description: |
+      Operator component name to use for finding the push pipeline YAML file.
+      If empty, uses the PipelineRun's appstudio.openshift.io/component label.
+    type: string
+    default: ""
   results:
   - name: CACHI2_ARTIFACT
     description: The Trusted Artifact URI pointing to the artifact with the prefetched dependencies.

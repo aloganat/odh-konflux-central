@@ -362,6 +362,8 @@ spec:
       value: $(params.build-version-tag)
     - name: SNAPSHOT
       value: $(tasks.generate-snapshot.results.SNAPSHOT)
+    - name: operatorComponentName
+      value: "odh-operator-ci"   
     taskRef:
       resolver: git
       params:
