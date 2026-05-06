@@ -143,8 +143,19 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.labels['appstudio.openshift.io/component']
+    - name: OPERATOR_COMPONENT_NAME_PARAM
+      value: $(params.operatorComponentName)
     workingDir: /var/workdir
     script: |
+      # Override component name if parameter is provided
+      if [ -n "${OPERATOR_COMPONENT_NAME_PARAM}" ]; then
+        ODH_OPERATOR_COMPONENT_NAME="${OPERATOR_COMPONENT_NAME_PARAM}"
+        echo "Using operator component name from parameter: ${ODH_OPERATOR_COMPONENT_NAME}"
+      else
+        echo "Using operator component name from label: ${ODH_OPERATOR_COMPONENT_NAME}"
+      fi
+
+
       # Install dependencies
       os="$(uname -s | tr '[:upper:]' '[:lower:]')"
       arch="$(uname -m | sed 's/x86_64/amd64/')"
