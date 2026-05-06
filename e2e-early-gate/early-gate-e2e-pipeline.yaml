@@ -565,10 +565,7 @@ spec:
           git config --global user.email "openshift-ai-devops@redhat.com"
           git init
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git"
-          git config core.sparseCheckout true
-          git config core.sparseCheckoutCone false
-          echo "components/odh-operator/docs" >> .git/info/sparse-checkout
-          git fetch --depth=1 origin main
+          git fetch --depth=1 origin main:main
           git checkout main
 
           #add content to new-dir
@@ -578,9 +575,9 @@ spec:
           cp /var/workdir/source/build/operands-map.yaml components/odh-operator/${OUTPUT_IMAGE_DIGEST}
           cp /var/workdir/source/build/manifests-config.yaml components/odh-operator/${OUTPUT_IMAGE_DIGEST}
 
-          git add --sparse components/odh-operator/${OUTPUT_IMAGE_DIGEST}
+          git add components/odh-operator/${OUTPUT_IMAGE_DIGEST}
           git commit -m "build-meta for operator image ${OUTPUT_IMAGE_DIGEST}"
-          git push
+          git push origin main
     when:
     - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
       operator: notin
