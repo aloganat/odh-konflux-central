@@ -363,7 +363,7 @@ spec:
     - name: SNAPSHOT
       value: $(tasks.generate-snapshot.results.SNAPSHOT)
     - name: operatorComponentName
-      value: "odh-operator-ci"   
+      value: "odh-operator-ci"
     taskRef:
       resolver: git
       params:
