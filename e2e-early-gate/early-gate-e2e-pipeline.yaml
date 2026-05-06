@@ -577,7 +577,7 @@ spec:
 
           git add components/odh-operator/${OUTPUT_IMAGE_DIGEST}
           git commit -m "build-meta for operator image ${OUTPUT_IMAGE_DIGEST}"
-          git push origin main
+          git push
     when:
     - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
       operator: notin
