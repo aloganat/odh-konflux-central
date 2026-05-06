@@ -560,13 +560,9 @@ spec:
           META_DIR=/var/workdir/odh-build-metadata
           mkdir -p ${META_DIR}
           cd ${META_DIR}
-          git config --global init.defaultBranch main
           git config --global user.name "OpenShift-AI-DevOps"
           git config --global user.email "openshift-ai-devops@redhat.com"
-          git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git"
-          git fetch --depth=1 origin main:main
-          git checkout main
+          git clone --depth=1 --branch main --single-branch "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git" .
 
           #add content to new-dir
           OUTPUT_IMAGE_DIGEST=${OUTPUT_IMAGE_DIGEST/sha256:/}
