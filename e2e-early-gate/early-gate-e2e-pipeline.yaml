@@ -564,20 +564,10 @@ spec:
           git config --global user.name "OpenShift-AI-DevOps"
           git config --global user.email "openshift-ai-devops@redhat.com"
 
-          # Initialize repo with sparse-checkout to avoid checking out huge tree
-          git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git"
-          git config core.sparseCheckout true
-          git config core.sparseCheckoutCone false
-
-          # Only checkout a minimal path (just .gitignore or similar)
-          echo "/.gitignore" > .git/info/sparse-checkout
-
-          # Fetch main branch
-          git fetch --depth=1 origin main
-
-          # Read tree without checking out files
-          git read-tree -mu FETCH_HEAD
+          # Blobless clone - fetches tree/commits but not file contents
+          git clone --filter=tree:0 --depth=1 --branch main --single-branch \
+            --no-checkout \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git" .
 
           #add content to new-dir
           OUTPUT_IMAGE_DIGEST=${OUTPUT_IMAGE_DIGEST/sha256:/}
