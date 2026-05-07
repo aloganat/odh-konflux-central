@@ -532,13 +532,6 @@ spec:
         - $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)=/var/workdir/source
         - $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)=/var/workdir/cachi2
       - image: quay.io/rhoai/rhoai-task-toolset:latest
-        computeResources:
-          requests:
-            memory: 6Gi
-            cpu: 1500m
-          limits:
-            memory: 12Gi
-            cpu: 3000m
         env:
         - name: SOURCE_ARTIFACT
           value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
@@ -567,20 +560,9 @@ spec:
           META_DIR=/var/workdir/odh-build-metadata
           mkdir -p ${META_DIR}
           cd ${META_DIR}
-
           git config --global init.defaultBranch main
           git config --global user.name "OpenShift-AI-DevOps"
           git config --global user.email "openshift-ai-devops@redhat.com"
-
-          # Configure git with memory-efficient settings for large commits
-          git config --global core.compression 1
-          git config --global core.packedGitLimit 256m
-          git config --global core.packedGitWindowSize 256m
-          git config --global pack.deltaCacheSize 256m
-          git config --global pack.packSizeLimit 256m
-          git config --global pack.windowMemory 256m
-          git config --global pack.threads 1
-
           git init
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git"
           git config core.sparseCheckout true
