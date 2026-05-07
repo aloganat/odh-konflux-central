@@ -73,22 +73,6 @@ spec:
       echo "Cloning utils repo: ${UTILS_REPO_URL} @ ${UTILS_REPO_BRANCH}"
       git clone --depth 1 --branch "${UTILS_REPO_BRANCH}" "${UTILS_REPO_URL}" /var/workdir/utils
 
-  - name: install-deps
-    image: quay.io/rhoai/rhoai-task-toolset:latest
-    script: |
-      #!/bin/bash
-      set -eo pipefail
-      os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-      arch="$(uname -m | sed 's/x86_64/amd64/')"
-
-      yq_version="v4.44.3"
-      curl -sSfLo /usr/local/bin/yq \
-        "https://github.com/mikefarah/yq/releases/download/$yq_version/yq_${os}_${arch}"
-      chmod +x /usr/local/bin/yq
-
-      pip install --default-timeout=100 \
-        -r /var/workdir/utils/utils/bundle-processor/requirements.txt
-
   - name: update-snapshot-and-process-bundle
     image: quay.io/rhoai/rhoai-task-toolset:latest
     env:
@@ -117,6 +101,19 @@ spec:
     script: |
       #!/bin/bash
       set -eo pipefail
+
+      # Install dependencies in the same container where they will be used
+      echo "Installing yq..."
+      os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+      arch="$(uname -m | sed 's/x86_64/amd64/')"
+      yq_version="v4.44.3"
+      curl -sSfLo /usr/local/bin/yq \
+        "https://github.com/mikefarah/yq/releases/download/$yq_version/yq_${os}_${arch}"
+      chmod +x /usr/local/bin/yq
+
+      echo "Installing Python dependencies..."
+      pip install --default-timeout=100 \
+        -r /var/workdir/utils/utils/bundle-processor/requirements.txt
 
       SOURCE=/var/workdir/source
       UTILS=/var/workdir/utils

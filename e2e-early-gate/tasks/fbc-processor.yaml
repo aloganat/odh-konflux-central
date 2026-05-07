@@ -86,48 +86,6 @@ spec:
       echo "Cloning utils repo: ${UTILS_REPO_URL} @ ${UTILS_REPO_BRANCH}"
       git clone --depth 1 --branch "${UTILS_REPO_BRANCH}" "${UTILS_REPO_URL}" /var/workdir/utils
 
-  - name: install-deps
-    image: quay.io/rhoai/rhoai-task-toolset:latest
-    env:
-    - name: OPENDATAHUB_QUAY_RO_USERNAME
-      valueFrom:
-        secretKeyRef:
-          name: early-gate-secrets
-          key: OPENDATAHUB_QUAY_RO_USERNAME
-    - name: OPENDATAHUB_QUAY_RO_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: early-gate-secrets
-          key: OPENDATAHUB_QUAY_RO_TOKEN
-    script: |
-      #!/bin/bash
-      set -eo pipefail
-      os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-      arch="$(uname -m | sed 's/x86_64/amd64/')"
-
-      # Install yq
-      yq_version="v4.44.3"
-      curl -sSfLo /usr/local/bin/yq \
-        "https://github.com/mikefarah/yq/releases/download/$yq_version/yq_${os}_${arch}"
-      chmod +x /usr/local/bin/yq
-
-      # Install opm
-      opm_version="v1.47.0"
-      curl -sSfLo /usr/local/bin/opm \
-        "https://github.com/operator-framework/operator-registry/releases/download/$opm_version/$os-$arch-opm"
-      chmod +x /usr/local/bin/opm
-
-      # Install Python deps
-      pip install --default-timeout=100 \
-        -r /var/workdir/utils/utils/fbc-processor/requirements.txt
-
-      # Install skopeo and login to Quay for pulling bundle images
-      microdnf install -y skopeo && microdnf clean all && rm -rf /var/cache/dnf/*
-      skopeo login \
-        -u "${OPENDATAHUB_QUAY_RO_USERNAME}" \
-        -p "${OPENDATAHUB_QUAY_RO_TOKEN}" \
-        quay.io/rhoai
-
   - name: process-fbc
     image: quay.io/rhoai/rhoai-task-toolset:latest
     env:
@@ -166,6 +124,34 @@ spec:
     script: |
       #!/bin/bash
       set -eo pipefail
+
+      # Install dependencies in the same container where they will be used
+      echo "Installing dependencies..."
+      os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+      arch="$(uname -m | sed 's/x86_64/amd64/')"
+
+      # Install yq
+      yq_version="v4.44.3"
+      curl -sSfLo /usr/local/bin/yq \
+        "https://github.com/mikefarah/yq/releases/download/$yq_version/yq_${os}_${arch}"
+      chmod +x /usr/local/bin/yq
+
+      # Install opm
+      opm_version="v1.47.0"
+      curl -sSfLo /usr/local/bin/opm \
+        "https://github.com/operator-framework/operator-registry/releases/download/$opm_version/$os-$arch-opm"
+      chmod +x /usr/local/bin/opm
+
+      # Install Python dependencies
+      pip install --default-timeout=100 \
+        -r /var/workdir/utils/utils/fbc-processor/requirements.txt
+
+      # Install skopeo and login to Quay for pulling bundle images
+      microdnf install -y skopeo && microdnf clean all && rm -rf /var/cache/dnf/*
+      skopeo login \
+        -u "${OPENDATAHUB_QUAY_RO_USERNAME}" \
+        -p "${OPENDATAHUB_QUAY_RO_TOKEN}" \
+        quay.io/rhoai
 
       SOURCE=/var/workdir/source
       UTILS=/var/workdir/utils
