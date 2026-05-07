@@ -362,8 +362,6 @@ spec:
       value: $(params.build-version-tag)
     - name: SNAPSHOT
       value: $(tasks.generate-snapshot.results.SNAPSHOT)
-    - name: operatorComponentName
-      value: "odh-operator-ci"
     taskRef:
       resolver: git
       params:
@@ -532,6 +530,13 @@ spec:
         - $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)=/var/workdir/source
         - $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)=/var/workdir/cachi2
       - image: quay.io/rhoai/rhoai-task-toolset:latest
+        computeResources:
+          requests:
+            memory: 4Gi
+            cpu: 1000m
+          limits:
+            memory: 8Gi
+            cpu: 2000m
         env:
         - name: SOURCE_ARTIFACT
           value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
@@ -561,13 +566,24 @@ spec:
           mkdir -p ${META_DIR}
           cd ${META_DIR}
 
+          # Configure git with memory-efficient settings
+          git config --global init.defaultBranch main
           git config --global user.name "OpenShift-AI-DevOps"
           git config --global user.email "openshift-ai-devops@redhat.com"
+          git config --global core.compression 1
+          git config --global core.packedGitLimit 128m
+          git config --global core.packedGitWindowSize 128m
+          git config --global pack.deltaCacheSize 128m
+          git config --global pack.packSizeLimit 128m
+          git config --global pack.windowMemory 128m
 
-          # Blobless clone - fetches tree/commits but not file contents
-          git clone --filter=tree:0 --depth=1 --branch main --single-branch \
-            --no-checkout \
-            "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git" .
+          git init
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${BUILD_METADATA_REPO}.git"
+          git config core.sparseCheckout true
+          git config core.sparseCheckoutCone false
+          echo "components/odh-operator/docs" >> .git/info/sparse-checkout
+          git fetch --depth=1 origin main
+          git checkout main
 
           #add content to new-dir
           OUTPUT_IMAGE_DIGEST=${OUTPUT_IMAGE_DIGEST/sha256:/}
@@ -576,18 +592,14 @@ spec:
           cp /var/workdir/source/build/operands-map.yaml components/odh-operator/${OUTPUT_IMAGE_DIGEST}
           cp /var/workdir/source/build/manifests-config.yaml components/odh-operator/${OUTPUT_IMAGE_DIGEST}
 
-          git add components/odh-operator/${OUTPUT_IMAGE_DIGEST}
-          git commit -m "build-meta for operator image ${OUTPUT_IMAGE_DIGEST}"
-          git push origin FETCH_HEAD:main
+          git add --sparse components/odh-operator/${OUTPUT_IMAGE_DIGEST}
+          git commit --quiet -m "build-meta for operator image ${OUTPUT_IMAGE_DIGEST}"
+          git push --quiet
     when:
     - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
       operator: notin
       values:
       - "true"
-    - input: $(params.pipeline-type)
-      operator: notin
-      values:
-      - "pull-request"
     workspaces:
     - name: basic-auth
       workspace: git-auth
@@ -600,7 +612,7 @@ spec:
     description: |
       Resolves the operator image URL and digest. When the operator was already
       in the snapshot (build skipped), extracts from SNAPSHOT JSON. When the
-      operator was built in this pipeline, uses the build task results.
+      operator was built in this pipeline, inspects the registry for the digest.
     runAfter:
     - push-build-metadata
     params:
@@ -614,8 +626,6 @@ spec:
       value: $(params.operator-git-url)
     - name: operator-revision
       value: $(params.operator-revision)
-    - name: built-operator-digest
-      value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
     taskSpec:
       params:
       - name: SNAPSHOT
@@ -623,7 +633,6 @@ spec:
       - name: operator-output-image
       - name: operator-git-url
       - name: operator-revision
-      - name: built-operator-digest
       results:
       - name: OPERATOR_IMAGE_URL
         description: Resolved operator image URL
@@ -647,8 +656,6 @@ spec:
           value: $(params.operator-git-url)
         - name: OPERATOR_REVISION
           value: $(params.operator-revision)
-        - name: BUILT_OPERATOR_DIGEST
-          value: $(params.built-operator-digest)
         script: |
           #!/bin/bash
           set -eo pipefail
@@ -661,9 +668,9 @@ spec:
             RESOLVED_GIT_URL=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.url"] // empty')
             RESOLVED_GIT_COMMIT=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.commit"] // empty')
           else
-            echo "Operator was built in this pipeline, using build task results..."
+            echo "Operator was built in this pipeline, inspecting registry..."
             RESOLVED_URL="${OPERATOR_OUTPUT_IMAGE}"
-            RESOLVED_DIGEST="${BUILT_OPERATOR_DIGEST}"
+            RESOLVED_DIGEST=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${OPERATOR_OUTPUT_IMAGE}")
             RESOLVED_GIT_URL="${OPERATOR_GIT_URL}"
             RESOLVED_GIT_COMMIT="${OPERATOR_REVISION}"
           fi
