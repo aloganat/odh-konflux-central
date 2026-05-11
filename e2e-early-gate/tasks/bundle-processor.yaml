@@ -43,6 +43,13 @@ spec:
     description: Branch of the utils repo
     type: string
     default: "odh"
+  - name: SNAPSHOT
+    description: |
+      Snapshot JSON from generate-snapshot (flat map of component name → {image, git.url, git.commit}).
+      Used to seed config/snapshot.json in ODH-Build-Config if the file is absent from the clone,
+      so bundle-processor.py can read the correct operator image rather than falling back to Quay.
+    type: string
+    default: "{}"
   results:
   - name: SOURCE_ARTIFACT
     description: OCI artifact with patched bundle in ODH-Build-Config source
@@ -86,6 +93,8 @@ spec:
       value: $(params.BRANCH)
     - name: OPERATOR_BUNDLE_COMPONENT_NAME
       value: $(params.OPERATOR_BUNDLE_COMPONENT_NAME)
+    - name: SNAPSHOT
+      value: $(params.SNAPSHOT)
     - name: OC_TOKEN
       valueFrom:
         secretKeyRef:
@@ -118,20 +127,26 @@ spec:
       SOURCE=/var/workdir/source
       UTILS=/var/workdir/utils
 
-      # --- Update snapshot.json with freshly-built operator image ---
+      # --- Seed config/snapshot.json from SNAPSHOT param if not present in the clone ---
       OPERATOR_IMAGE="${OPERATOR_IMAGE_URL}@${OPERATOR_IMAGE_DIGEST}"
-      echo "Updating snapshot.json with operator image: ${OPERATOR_IMAGE}"
       SNAPSHOT_PATH="${SOURCE}/config/snapshot.json"
-      if [ -f "${SNAPSHOT_PATH}" ]; then
-        jq --arg img "$OPERATOR_IMAGE" \
-          '(.["odh-operator-ci"].image) = $img' \
-          "${SNAPSHOT_PATH}" > /tmp/snapshot.json \
-          && mv /tmp/snapshot.json "${SNAPSHOT_PATH}"
-        echo "Updated snapshot.json entry for odh-operator-ci:"
-        jq '.["odh-operator-ci"]' "${SNAPSHOT_PATH}"
+      mkdir -p "${SOURCE}/config"
+
+      if [ ! -f "${SNAPSHOT_PATH}" ]; then
+        echo "config/snapshot.json not found in ODH-Build-Config clone; seeding from SNAPSHOT param"
+        echo "${SNAPSHOT}" > "${SNAPSHOT_PATH}"
       else
-        echo "WARNING: snapshot.json not found at ${SNAPSHOT_PATH}"
+        echo "config/snapshot.json already exists in clone"
       fi
+
+      # --- Update odh-operator-ci.image with the freshly-built operator image ---
+      echo "Updating snapshot.json with operator image: ${OPERATOR_IMAGE}"
+      jq --arg img "$OPERATOR_IMAGE" \
+        '(.["odh-operator-ci"].image) = $img' \
+        "${SNAPSHOT_PATH}" > /tmp/snapshot.json \
+        && mv /tmp/snapshot.json "${SNAPSHOT_PATH}"
+      echo "Updated snapshot.json entry for odh-operator-ci:"
+      jq '.["odh-operator-ci"]' "${SNAPSHOT_PATH}"
 
       # --- Copy raw bundle inputs to tmp ---
       RAW_INPUTS_DIR=${UTILS}/tmp/bundle

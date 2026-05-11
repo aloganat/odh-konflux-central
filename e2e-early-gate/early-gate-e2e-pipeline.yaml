@@ -735,6 +735,8 @@ spec:
       value: $(params.utils-repo-url)
     - name: UTILS_REPO_BRANCH
       value: $(params.utils-repo-ref)
+    - name: SNAPSHOT
+      value: $(tasks.generate-snapshot.results.SNAPSHOT)
     taskRef:
       resolver: git
       params:
