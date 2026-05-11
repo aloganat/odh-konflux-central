@@ -735,8 +735,6 @@ spec:
       value: $(params.utils-repo-url)
     - name: UTILS_REPO_BRANCH
       value: $(params.utils-repo-ref)
-    - name: SNAPSHOT
-      value: $(tasks.generate-snapshot.results.SNAPSHOT)
     taskRef:
       resolver: git
       params:
@@ -745,7 +743,7 @@ spec:
       - name: revision
         value: earlygate
       - name: pathInRepo
-        value: e2e-early-gate/tasks/bundle-processor-v2.yaml
+        value: e2e-early-gate/tasks/bundle-processor.yaml
 
   - name: prefetch-dependencies-bundle
     runAfter:
@@ -873,8 +871,6 @@ spec:
       value: $(params.utils-repo-url)
     - name: UTILS_REPO_BRANCH
       value: $(params.utils-repo-ref)
-    - name: SNAPSHOT
-      value: $(tasks.generate-snapshot.results.SNAPSHOT)
     taskRef:
       resolver: git
       params:
@@ -883,7 +879,7 @@ spec:
       - name: revision
         value: earlygate
       - name: pathInRepo
-        value: e2e-early-gate/tasks/fbc-processor-v2.yaml
+        value: e2e-early-gate/tasks/fbc-processor.yaml
 
   - name: prefetch-dependencies-fbc
     runAfter:
