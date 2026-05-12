@@ -161,7 +161,7 @@ spec:
       CATALOG_BUILD_ARGS_FILE_PATH=${SOURCE}/catalog/catalog_build_args.map
       PUSH_PIPELINE_PATH=${SOURCE}/.tekton/${FBC_PUSH_PIPELINE_COMPONENT}-push.yaml
 
-      BUNDLE_IMAGE="${BUNDLE_IMAGE_URL}@${BUNDLE_IMAGE_DIGEST}"
+      BUNDLE_IMAGE="${BUNDLE_IMAGE_URL%:*}@${BUNDLE_IMAGE_DIGEST}"
       echo "Bundle image for FBC: ${BUNDLE_IMAGE}"
 
       # --- extract-snapshot-images ---
