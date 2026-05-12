@@ -128,7 +128,7 @@ spec:
       UTILS=/var/workdir/utils
 
       # --- Seed config/snapshot.json from SNAPSHOT param if not present in the clone ---
-      OPERATOR_IMAGE="${OPERATOR_IMAGE_URL}@${OPERATOR_IMAGE_DIGEST}"
+      OPERATOR_IMAGE="${OPERATOR_IMAGE_URL%:*}@${OPERATOR_IMAGE_DIGEST}"
       SNAPSHOT_PATH="${SOURCE}/config/snapshot.json"
       mkdir -p "${SOURCE}/config"
 
