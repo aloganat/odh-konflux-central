@@ -171,14 +171,15 @@ spec:
       yq '.patch.relatedImages[] | select(.name == "RELATED_IMAGE_ODH_OPERATOR_IMAGE")' "${PATCH_YAML_PATH}"
 
       # --- Run bundle-processor ---
-      echo "Running bundle-processor.py -op bundle-patch"
+      OPERATOR_TAG="${OPERATOR_IMAGE_URL##*:}"
+      echo "Running bundle-processor.py -op bundle-patch with OPERATOR_TAG=${OPERATOR_TAG}"
       python3 ${UTILS}/utils/bundle-processor/bundle-processor.py \
         -op bundle-patch \
         -b ${BUILD_CONFIG_PATH} \
         -c ${BUNDLE_CSV_PATH} \
         -p ${PATCH_YAML_PATH} \
         -o ${OUTPUT_FILE_PATH} \
-        -q ${QUAY_TAG} \
+        -q ${OPERATOR_TAG} \
         -r ${BRANCH} \
         -a ${ANNOTATION_YAML_PATH} \
         --push-pipeline-yaml-path ${PUSH_PIPELINE_PATH} \
