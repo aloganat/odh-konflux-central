@@ -327,8 +327,6 @@ spec:
       value: $(params.operator-git-url)
     - name: operator-revision
       value: $(params.operator-revision)
-    - name: built-operator-digest
-      value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
     taskSpec:
       params:
       - name: SNAPSHOT
@@ -336,7 +334,6 @@ spec:
       - name: operator-output-image
       - name: operator-git-url
       - name: operator-revision
-      - name: built-operator-digest
       results:
       - name: OPERATOR_IMAGE_URL
         description: Resolved operator image URL
@@ -360,8 +357,6 @@ spec:
           value: $(params.operator-git-url)
         - name: OPERATOR_REVISION
           value: $(params.operator-revision)
-        - name: BUILT_OPERATOR_DIGEST
-          value: $(params.built-operator-digest)
         - name: PR_NUMBER
           valueFrom:
             fieldRef:
@@ -380,11 +375,12 @@ spec:
             RESOLVED_GIT_URL=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.url"] // empty')
             RESOLVED_GIT_COMMIT=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.commit"] // empty')
           else
-            echo "Operator was built in this pipeline, using build task results..."
-            RESOLVED_URL="${OPERATOR_OUTPUT_IMAGE}"
-            RESOLVED_DIGEST="${BUILT_OPERATOR_DIGEST}"
-            RESOLVED_GIT_URL="${OPERATOR_GIT_URL}"
-            RESOLVED_GIT_COMMIT="${OPERATOR_REVISION}"
+            echo "operator was not found in snapshot, the PR build is not successful so far, exiting..."
+            exit 1
+            # RESOLVED_URL="${OPERATOR_OUTPUT_IMAGE}"
+            # RESOLVED_DIGEST="${BUILT_OPERATOR_DIGEST}"
+            # RESOLVED_GIT_URL="${OPERATOR_GIT_URL}"
+            # RESOLVED_GIT_COMMIT="${OPERATOR_REVISION}"
           fi
 
           echo "Resolved operator image: ${RESOLVED_URL}@${RESOLVED_DIGEST}"
