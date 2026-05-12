@@ -162,6 +162,14 @@ spec:
       ANNOTATION_YAML_PATH=${RAW_INPUTS_DIR}/metadata/annotations.yaml
       PUSH_PIPELINE_PATH=${SOURCE}/.tekton/${OPERATOR_BUNDLE_COMPONENT_NAME}-push.yaml
 
+      # --- Patch bundle-patch.yaml: set all RELATED_IMAGE_ODH_OPERATOR_IMAGE entries to freshly-built image ---
+      echo "Patching bundle-patch.yaml RELATED_IMAGE_ODH_OPERATOR_IMAGE → ${OPERATOR_IMAGE}"
+      export OPERATOR_IMAGE
+      echo "OPERATOR_IMAGE: ${OPERATOR_IMAGE}"
+      yq -i '(.patch.relatedImages[] | select(.name == "RELATED_IMAGE_ODH_OPERATOR_IMAGE")).value = env(OPERATOR_IMAGE)' "${PATCH_YAML_PATH}"
+      echo "Updated RELATED_IMAGE_ODH_OPERATOR_IMAGE entries in bundle-patch.yaml:"
+      yq '.patch.relatedImages[] | select(.name == "RELATED_IMAGE_ODH_OPERATOR_IMAGE")' "${PATCH_YAML_PATH}"
+
       # --- Run bundle-processor ---
       echo "Running bundle-processor.py -op bundle-patch"
       python3 ${UTILS}/utils/bundle-processor/bundle-processor.py \
@@ -169,7 +177,6 @@ spec:
         -b ${BUILD_CONFIG_PATH} \
         -c ${BUNDLE_CSV_PATH} \
         -p ${PATCH_YAML_PATH} \
-        -sn ${SNAPSHOT_JSON_PATH} \
         -o ${OUTPUT_FILE_PATH} \
         -q ${QUAY_TAG} \
         -r ${BRANCH} \
