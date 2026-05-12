@@ -185,7 +185,7 @@ spec:
       - name: url
         value: https://github.com/red-hat-data-services/rhoai-konflux-tasks.git
       - name: revision
-        value: main
+        value: odh
       - name: pathInRepo
         value: konflux-tekton-tasks/rhoai-init/0.3/rhoai-init.yaml
 
@@ -491,6 +491,7 @@ spec:
     - name: ADDITIONAL_TAGS
       value:
       - $(tasks.rhoai-init.results.mandatory-tag)
+      - $(tasks.rhoai-init.results.unique-tag)
       - $(params.operator-additional-tags[*])
     taskRef:
       params:
@@ -841,6 +842,7 @@ spec:
     - name: ADDITIONAL_TAGS
       value:
       - $(tasks.rhoai-init.results.mandatory-tag)
+      - $(tasks.rhoai-init.results.unique-tag)
     taskRef:
       params:
       - name: name
@@ -978,6 +980,7 @@ spec:
     - name: ADDITIONAL_TAGS
       value:
       - $(tasks.rhoai-init.results.mandatory-tag)
+      - $(tasks.rhoai-init.results.unique-tag)
     taskRef:
       params:
       - name: name
