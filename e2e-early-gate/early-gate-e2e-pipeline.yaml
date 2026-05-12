@@ -654,6 +654,10 @@ spec:
           value: $(params.operator-revision)
         - name: BUILT_OPERATOR_DIGEST
           value: $(params.built-operator-digest)
+        - name: PR_NUMBER
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pipelinesascode.tekton.dev/pull-request']
         script: |
           #!/bin/bash
           set -eo pipefail
@@ -661,7 +665,9 @@ spec:
           if [ "${SNAPSHOT_CONTAINS_OPERATOR}" == "true" ]; then
             echo "Operator image found in snapshot, extracting..."
             IMAGE=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"].image')
-            RESOLVED_URL="${IMAGE%%@*}"
+            RESOLVED_REPO="${IMAGE%%@*}"
+            RESOLVED_TAG="odh-pr-${PR_NUMBER}"
+            RESOLVED_URL="${RESOLVED_REPO}:${RESOLVED_TAG}"
             RESOLVED_DIGEST="${IMAGE##*@}"
             RESOLVED_GIT_URL=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.url"] // empty')
             RESOLVED_GIT_COMMIT=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"]["git.commit"] // empty')
