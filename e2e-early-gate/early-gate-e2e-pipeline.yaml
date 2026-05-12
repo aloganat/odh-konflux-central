@@ -511,11 +511,6 @@ spec:
     description: Push operator build manifests to odh-build-metadata repo
     runAfter:
     - apply-tags-operator
-    when:
-    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
-      operator: notin
-      values:
-      - "true"
     params:
     - name: build-metadata-repo
       value: "$(params.build-metadata-repo)"
