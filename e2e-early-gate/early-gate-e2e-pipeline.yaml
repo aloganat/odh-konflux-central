@@ -485,9 +485,9 @@ spec:
     - build-operator-container
     params:
     - name: IMAGE_URL
-      value: $(tasks.build-operator-container.results.IMAGE_URL ?? "")
+      value: $(tasks.build-operator-container.results.IMAGE_URL)
     - name: IMAGE_DIGEST
-      value: $(tasks.build-operator-container.results.IMAGE_DIGEST ?? "")
+      value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
     - name: ADDITIONAL_TAGS
       value:
       - $(tasks.rhoai-init.results.mandatory-tag)
@@ -510,7 +510,7 @@ spec:
   - name: push-build-metadata
     description: Push operator build manifests to odh-build-metadata repo
     runAfter:
-    - apply-tags-operator
+    - build-operator-container
     params:
     - name: build-metadata-repo
       value: "$(params.build-metadata-repo)"
