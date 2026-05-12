@@ -485,9 +485,9 @@ spec:
     - build-operator-container
     params:
     - name: IMAGE_URL
-      value: $(tasks.build-operator-container.results.IMAGE_URL)
+      value: $(tasks.build-operator-container.results.IMAGE_URL ?? "")
     - name: IMAGE_DIGEST
-      value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
+      value: $(tasks.build-operator-container.results.IMAGE_DIGEST ?? "")
     - name: ADDITIONAL_TAGS
       value:
       - $(tasks.rhoai-init.results.mandatory-tag)
@@ -511,6 +511,11 @@ spec:
     description: Push operator build manifests to odh-build-metadata repo
     runAfter:
     - apply-tags-operator
+    when:
+    - input: $(tasks.audit-snapshot.results.snapshot-contains-operator)
+      operator: notin
+      values:
+      - "true"
     params:
     - name: build-metadata-repo
       value: "$(params.build-metadata-repo)"
@@ -529,8 +534,8 @@ spec:
         image: quay.io/redhat-appstudio/build-trusted-artifacts:latest@sha256:81c4864dae6bb11595f657be887e205262e70086a05ed16ada827fd6391926ac
         args:
         - use
-        - $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)=/var/workdir/source
-        - $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)=/var/workdir/cachi2
+        - $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT ?? "")=/var/workdir/source
+        - $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT ?? "")=/var/workdir/cachi2
       - image: quay.io/rhoai/rhoai-task-toolset:latest
         computeResources:
             requests:
@@ -541,11 +546,11 @@ spec:
               memory: 16Gi
         env:
         - name: SOURCE_ARTIFACT
-          value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
+          value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT ?? "")
         - name: CACHI2_ARTIFACT
-          value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT)
+          value: $(tasks.prefetch-manifests.results.CACHI2_ARTIFACT ?? "")
         - name: OUTPUT_IMAGE_DIGEST
-          value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
+          value: $(tasks.build-operator-container.results.IMAGE_DIGEST ?? "")
         - name: BUILD_METADATA_REPO
           value: "$(params.build-metadata-repo)"
         - name: GITHUB_TOKEN
@@ -620,7 +625,7 @@ spec:
     - name: operator-revision
       value: $(params.operator-revision)
     - name: built-operator-digest
-      value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
+      value: $(tasks.build-operator-container.results.IMAGE_DIGEST ?? "")
     taskSpec:
       params:
       - name: SNAPSHOT
