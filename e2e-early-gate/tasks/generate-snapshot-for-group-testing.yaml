@@ -12,10 +12,6 @@ spec:
     - name: COMPONENTS
       description: List of components in the group (JSON). If empty, fetched from component_repo_map.json using REPO_NAME.
       default: ""
-    - name: REPO_NAME
-      type: string
-      description: Repository name key in component_repo_map.json. Used to fetch COMPONENTS when COMPONENTS param is empty.
-      default: ""
     - name: fallback-tag
       type: string
       default: odh-stable
@@ -32,8 +28,6 @@ spec:
       env:
         - name: COMPONENTS
           value: $(params.COMPONENTS)
-        - name: REPO_NAME
-          value: $(params.REPO_NAME)
         - name: FALLBACK_TAG
           value: $(params.fallback-tag)
         - name: WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND
@@ -44,6 +38,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.labels['pipelinesascode.tekton.dev/pull-request']
+        - name: REPO_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pipelinesascode.tekton.dev/url-repository']
       script: |
         #!/bin/bash
         set -e
