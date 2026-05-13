@@ -43,13 +43,13 @@ spec:
     description: Branch of the utils repo
     type: string
     default: "odh"
-  - name: SNAPSHOT
+  - name: SNAPSHOT_ARTIFACT
     description: |
-      Snapshot JSON from generate-snapshot (flat map of component name → {image, git.url, git.commit}).
-      Used to seed config/snapshot.json in ODH-Build-Config if the file is absent from the clone,
-      so bundle-processor.py can read the correct operator image rather than falling back to Quay.
+      OCI trusted artifact URI from generate-snapshot containing snapshot.json.
+      Mounted at /var/workdir/snapshot/snapshot.json and seeded into ODH-Build-Config
+      so bundle-processor.py reads the correct operator image rather than falling back to Quay.
     type: string
-    default: "{}"
+    default: ""
   results:
   - name: SOURCE_ARTIFACT
     description: OCI artifact with patched bundle in ODH-Build-Config source
@@ -66,6 +66,7 @@ spec:
     args:
     - use
     - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+    - $(params.SNAPSHOT_ARTIFACT)=/var/workdir/snapshot
 
   - name: clone-utils
     image: quay.io/rhoai/rhoai-task-toolset:latest
@@ -93,8 +94,8 @@ spec:
       value: $(params.BRANCH)
     - name: OPERATOR_BUNDLE_COMPONENT_NAME
       value: $(params.OPERATOR_BUNDLE_COMPONENT_NAME)
-    - name: SNAPSHOT
-      value: $(params.SNAPSHOT)
+    - name: SNAPSHOT_ARTIFACT
+      value: $(params.SNAPSHOT_ARTIFACT)
     - name: OC_TOKEN
       valueFrom:
         secretKeyRef:
@@ -127,14 +128,20 @@ spec:
       SOURCE=/var/workdir/source
       UTILS=/var/workdir/utils
 
-      # --- Seed config/snapshot.json from SNAPSHOT param if not present in the clone ---
+      # --- Seed config/snapshot.json from SNAPSHOT artifact if not present in the clone ---
       OPERATOR_IMAGE="${OPERATOR_IMAGE_URL%:*}@${OPERATOR_IMAGE_DIGEST}"
       SNAPSHOT_PATH="${SOURCE}/config/snapshot.json"
+      SNAPSHOT_ARTIFACT_FILE=/var/workdir/snapshot/snapshot.json
       mkdir -p "${SOURCE}/config"
 
       if [ ! -f "${SNAPSHOT_PATH}" ]; then
-        echo "config/snapshot.json not found in ODH-Build-Config clone; seeding from SNAPSHOT param"
-        echo "${SNAPSHOT}" > "${SNAPSHOT_PATH}"
+        if [ -f "${SNAPSHOT_ARTIFACT_FILE}" ]; then
+          echo "config/snapshot.json not found in ODH-Build-Config clone; seeding from SNAPSHOT artifact"
+          cp "${SNAPSHOT_ARTIFACT_FILE}" "${SNAPSHOT_PATH}"
+        else
+          echo "config/snapshot.json not found and no SNAPSHOT artifact available; initialising empty snapshot"
+          echo "{}" > "${SNAPSHOT_PATH}"
+        fi
       else
         echo "config/snapshot.json already exists in clone"
       fi

@@ -227,6 +227,10 @@ spec:
     params:
     - name: COMPONENTS
       value: $(params.group-components)
+    - name: ociStorage
+      value: $(params.operator-output-image).snapshot
+    - name: ociArtifactExpiresAfter
+      value: $(params.image-expires-after)
     workspaces:
     - name: basic-auth
       workspace: git-auth
@@ -257,13 +261,25 @@ spec:
       - name: git-org
       - name: git-revision
       - name: snapshot-contains-operator
+      volumes:
+      - name: workdir
+        emptyDir: {}
+      stepTemplate:
+        volumeMounts:
+        - mountPath: /var/workdir
+          name: workdir
       steps:
+      - name: use-trusted-artifact
+        image: quay.io/redhat-appstudio/build-trusted-artifacts:latest@sha256:81c4864dae6bb11595f657be887e205262e70086a05ed16ada827fd6391926ac
+        args:
+        - use
+        - $(tasks.generate-snapshot.results.SNAPSHOT_ARTIFACT)=/var/workdir/snapshot
       - name: audit-snapshot
         image: quay.io/konflux-ci/konflux-test:stable
         workingDir: /workspace
         env:
-        - name: SNAPSHOT
-          value: $(tasks.generate-snapshot.results.SNAPSHOT)
+        - name: SNAPSHOT_FILE
+          value: /var/workdir/snapshot/snapshot.json
         - name: COMPONENTS
           value: $(params.COMPONENTS)
         - name: PR_AUTHOR
@@ -289,6 +305,7 @@ spec:
         script: |
           #!/bin/bash
           set -e
+          SNAPSHOT=$(cat "${SNAPSHOT_FILE}")
           echo "SNAPSHOT=${SNAPSHOT}"
           SNAPSHOT_CONTAINS_ODH_OPERATOR=false
           # Parse JSON and iterate through each component
@@ -368,8 +385,8 @@ spec:
       value: $(params.utils-repo-branch)
     - name: buildVersionTag
       value: $(params.build-version-tag)
-    - name: SNAPSHOT
-      value: $(tasks.generate-snapshot.results.SNAPSHOT)
+    - name: SNAPSHOT_ARTIFACT
+      value: $(tasks.generate-snapshot.results.SNAPSHOT_ARTIFACT)
     - name: operatorComponentName
       value: "odh-operator-ci"
     taskRef:
@@ -619,8 +636,8 @@ spec:
     runAfter:
     - push-build-metadata
     params:
-    - name: SNAPSHOT
-      value: $(tasks.generate-snapshot.results.SNAPSHOT)
+    - name: SNAPSHOT_ARTIFACT
+      value: $(tasks.generate-snapshot.results.SNAPSHOT_ARTIFACT)
     - name: snapshot-contains-operator
       value: $(tasks.audit-snapshot.results.snapshot-contains-operator)
     - name: operator-output-image
@@ -633,7 +650,7 @@ spec:
       value: $(tasks.build-operator-container.results.IMAGE_DIGEST)
     taskSpec:
       params:
-      - name: SNAPSHOT
+      - name: SNAPSHOT_ARTIFACT
       - name: snapshot-contains-operator
       - name: operator-output-image
       - name: operator-git-url
@@ -648,12 +665,24 @@ spec:
         description: Operator source git URL
       - name: OPERATOR_GIT_COMMIT
         description: Operator source git commit
+      volumes:
+      - name: workdir
+        emptyDir: {}
+      stepTemplate:
+        volumeMounts:
+        - mountPath: /var/workdir
+          name: workdir
       steps:
+      - name: use-trusted-artifact
+        image: quay.io/redhat-appstudio/build-trusted-artifacts:latest@sha256:81c4864dae6bb11595f657be887e205262e70086a05ed16ada827fd6391926ac
+        args:
+        - use
+        - $(params.SNAPSHOT_ARTIFACT)=/var/workdir/snapshot
       - name: resolve
         image: quay.io/rhoai/rhoai-task-toolset:latest
         env:
-        - name: SNAPSHOT
-          value: $(params.SNAPSHOT)
+        - name: SNAPSHOT_FILE
+          value: /var/workdir/snapshot/snapshot.json
         - name: SNAPSHOT_CONTAINS_OPERATOR
           value: $(params.snapshot-contains-operator)
         - name: OPERATOR_OUTPUT_IMAGE
@@ -672,6 +701,7 @@ spec:
           #!/bin/bash
           set -eo pipefail
 
+          SNAPSHOT=$(cat "${SNAPSHOT_FILE}")
           if [ "${SNAPSHOT_CONTAINS_OPERATOR}" == "true" ]; then
             echo "Operator image found in snapshot, extracting..."
             IMAGE=$(echo "${SNAPSHOT}" | jq -r '.["odh-operator-ci"].image')
@@ -751,8 +781,8 @@ spec:
       value: $(params.utils-repo-url)
     - name: UTILS_REPO_BRANCH
       value: $(params.utils-repo-ref)
-    - name: SNAPSHOT
-      value: $(tasks.generate-snapshot.results.SNAPSHOT)
+    - name: SNAPSHOT_ARTIFACT
+      value: $(tasks.generate-snapshot.results.SNAPSHOT_ARTIFACT)
     taskRef:
       resolver: git
       params:
