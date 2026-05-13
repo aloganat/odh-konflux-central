@@ -11,7 +11,8 @@ spec:
   # --- Group snapshot ---
   - name: group-components
     type: string
-    description: List of components in the group (JSON)
+    description: List of components in the group (JSON) 
+    default: ""
 
   # --- General ---
   - description: Source Repository URL
@@ -233,18 +234,18 @@ spec:
       resolver: git
       params:
       - name: url
-        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks.git
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
       - name: revision
-        value: main
+        value: earlygate
       - name: pathInRepo
-        value: konflux-tekton-tasks/generate-snapshot-for-group-testing/0.1/generate-snapshot-for-group-testing.yaml
+        value: e2e-early-gate/tasks/generate-snapshot-for-group-testing.yaml
 
   - name: audit-snapshot
     runAfter:
     - generate-snapshot
     params:
     - name: COMPONENTS
-      value: $(params.group-components)
+      value: $(tasks.generate-snapshot.results.group-components)
     taskSpec:
       params:
       - name: COMPONENTS
