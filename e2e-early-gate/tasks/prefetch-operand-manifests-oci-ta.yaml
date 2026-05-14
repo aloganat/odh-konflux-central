@@ -53,11 +53,10 @@ spec:
     description: Image tag of operand images to be sought by operator-processor
     type: string
     default: "latest"
-  - name: SNAPSHOT
+  - name: SNAPSHOT_ARTIFACT
     description: |
-      Konflux SNAPSHOT JSON from generate-snapshot. Contains final image URIs for
-      group components. For components present in the SNAPSHOT, their image URIs
-      override the ones resolved via buildVersionTag. Empty string means no overrides.
+      OCI trusted artifact URI from generate-snapshot containing snapshot.json.
+      Mounted at /var/workdir/snapshot/snapshot.json. Empty string means no overrides.
     type: string
     default: ""
   - name: operatorComponentName
@@ -111,8 +110,8 @@ spec:
       value: ""
     - name: BUILD_VERSION_TAG
       value: $(params.buildVersionTag)
-    - name: SNAPSHOT
-      value: $(params.SNAPSHOT)
+    - name: SNAPSHOT_ARTIFACT
+      value: $(params.SNAPSHOT_ARTIFACT)
     volumeMounts:
     - mountPath: /mnt/config
       name: config
@@ -124,6 +123,7 @@ spec:
     args:
     - use
     - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+    - $(params.SNAPSHOT_ARTIFACT)=/var/workdir/snapshot
   - name: prefetch-manifests
     image: quay.io/rhoai/rhoai-task-toolset:latest
     volumeMounts:
@@ -195,10 +195,11 @@ spec:
       # operands-map.yaml and update git.commit in manifests-config.yaml.
       # Components NOT in the SNAPSHOT keep the buildVersionTag-resolved values.
       # =====================================================================
-      if [ -n "${SNAPSHOT}" ] && [ "${SNAPSHOT}" != "" ] && [ "${SNAPSHOT}" != "{}" ]; then
+      SNAPSHOT_FILE=/var/workdir/snapshot/snapshot.json
+      if [ -f "${SNAPSHOT_FILE}" ]; then
         echo ""
         echo "*************** Applying SNAPSHOT overrides ***************"
-        echo "${SNAPSHOT}" > /tmp/snapshot_input.json
+        cp "${SNAPSHOT_FILE}" /tmp/snapshot_input.json
 
         cat > /tmp/apply_snapshot_overrides.py << 'PYEOF'
       import argparse
@@ -293,7 +294,7 @@ spec:
         echo "----- MANIFEST_CONFIG (after SNAPSHOT overrides) ------"
         cat $MANIFEST_CONFIG_PATH
       else
-        echo "No SNAPSHOT provided, using buildVersionTag-resolved images for all components."
+        echo "No SNAPSHOT artifact found at ${SNAPSHOT_FILE}, using buildVersionTag-resolved images for all components."
       fi
 
       echo "*************** Prefetching manifests ********************"
