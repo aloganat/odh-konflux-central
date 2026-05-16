@@ -149,6 +149,7 @@ spec:
 
         if [ -n "${RUN_ID}" ]; then
           echo "Found run ID: ${RUN_ID}"
+          echo "Workflow run URL: https://github.com/${WORKFLOW_REPO}/actions/runs/${RUN_ID}"
           break
         fi
         echo "Attempt ${attempt}/30: run not found yet..."
