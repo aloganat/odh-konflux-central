@@ -89,15 +89,6 @@ spec:
         value: earlygate
       - name: pathInRepo
         value: e2e-early-gate/tasks/check-prerequisites.yaml
-    params:
-    - name: workflow-token-secret-name
-      value: $(params.workflow-token-secret-name)
-    - name: workflow-token-secret-key
-      value: $(params.workflow-token-secret-key)
-    - name: pr-token-secret-name
-      value: $(params.pr-token-secret-name)
-    - name: pr-token-secret-key
-      value: $(params.pr-token-secret-key)
 
   # --------------------------------------------------------------------------
   # 2. Check for ongoing jobs — scan PR comments for idempotency

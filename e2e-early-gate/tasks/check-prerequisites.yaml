@@ -9,15 +9,6 @@ spec:
   description: |
     Verifies that the quay catalog and bundle images built for this PR exist
     before triggering the early-gate test pipeline.
-  params:
-  - name: github-token-secret-name
-    description: Name of the Kubernetes secret containing the GitHub token
-    type: string
-    default: early-gate-secrets
-  - name: github-token-secret-key
-    description: Key in the secret that holds the GitHub token
-    type: string
-    default: GITHUB_TOKEN
   steps:
   - name: check-images
     image: quay.io/konflux-ci/konflux-test:stable
@@ -30,11 +21,6 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
-    - name: GITHUB_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: $(params.github-token-secret-name)
-          key: $(params.github-token-secret-key)
     script: |
       #!/bin/bash
       set -euo pipefail
