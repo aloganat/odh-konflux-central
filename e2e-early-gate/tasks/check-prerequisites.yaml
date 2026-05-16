@@ -1,0 +1,76 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: check-prerequisites
+  labels:
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: |
+    Verifies that the quay catalog and bundle images built for this PR exist
+    before triggering the early-gate test pipeline.
+  params:
+  - name: github-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token
+    type: string
+    default: early-gate-secrets
+  - name: github-token-secret-key
+    description: Key in the secret that holds the GitHub token
+    type: string
+    default: GITHUB_TOKEN
+  steps:
+  - name: check-images
+    image: quay.io/konflux-ci/konflux-test:stable
+    env:
+    - name: PR_NUMBER
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.labels['pipelinesascode.tekton.dev/pull-request']
+    - name: REPO_URL
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: $(params.github-token-secret-name)
+          key: $(params.github-token-secret-key)
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+
+      # Extract just the repo name from org/repo format
+      REPO_NAME="${REPO_URL##*/}"
+
+      CATALOG_IMAGE="quay.io/opendatahub/opendatahub-operator-catalog:odh-pr-${PR_NUMBER}-${REPO_NAME}"
+      BUNDLE_IMAGE="quay.io/opendatahub/opendatahub-operator-bundle:odh-pr-${PR_NUMBER}-${REPO_NAME}"
+
+      echo "Checking prerequisites for PR #${PR_NUMBER} in repo ${REPO_NAME}"
+      echo "Catalog image: ${CATALOG_IMAGE}"
+      echo "Bundle image:  ${BUNDLE_IMAGE}"
+
+      MISSING=0
+
+      if skopeo inspect --no-creds "docker://${CATALOG_IMAGE}" &>/dev/null; then
+        echo "✓ Catalog image exists: ${CATALOG_IMAGE}"
+      else
+        echo "✗ Catalog image NOT found: ${CATALOG_IMAGE}"
+        MISSING=1
+      fi
+
+      if skopeo inspect --no-creds "docker://${BUNDLE_IMAGE}" &>/dev/null; then
+        echo "✓ Bundle image exists: ${BUNDLE_IMAGE}"
+      else
+        echo "✗ Bundle image NOT found: ${BUNDLE_IMAGE}"
+        MISSING=1
+      fi
+
+      if [ "${MISSING}" -eq 1 ]; then
+        echo ""
+        echo "Prerequisites not met. Both quay images must exist before running early-gate tests."
+        echo "Ensure the early-gate-component-pipeline has completed successfully for this PR."
+        exit 1
+      fi
+
+      echo ""
+      echo "All prerequisites met. Proceeding with early-gate test pipeline."

@@ -1,0 +1,219 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: trigger-test-pipeline
+  labels:
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: |
+    Dispatches the early-gate trigger GitHub workflow to schedule a Jenkins job,
+    monitors the workflow run to extract the Jenkins queue URL, and posts a
+    queue-url-comment on the PR.
+  params:
+  - name: github-workflow-repo
+    description: Owner/repo of the GitHub repo containing the trigger workflow
+    type: string
+    default: red-hat-data-services/rhods-devops-infra
+  - name: trigger-workflow-file
+    description: Workflow filename to dispatch
+    type: string
+    default: dummy-earlygate-smoke-trigger.yaml
+  - name: github-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token
+    type: string
+    default: early-gate-secrets
+  - name: github-token-secret-key
+    description: Key in the secret that holds the GitHub token
+    type: string
+    default: GITHUB_TOKEN
+  results:
+  - name: queue-url
+    description: Jenkins queue URL for the triggered job
+  - name: correlation-id
+    description: Correlation ID used for this trigger invocation
+  steps:
+  - name: trigger-and-extract-queue-url
+    image: quay.io/konflux-ci/konflux-test:stable
+    env:
+    - name: PR_NUMBER
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.labels['pipelinesascode.tekton.dev/pull-request']
+    - name: REPO_URL
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: $(params.github-token-secret-name)
+          key: $(params.github-token-secret-key)
+    - name: WORKFLOW_REPO
+      value: $(params.github-workflow-repo)
+    - name: TRIGGER_WORKFLOW
+      value: $(params.trigger-workflow-file)
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+
+      JENKINS_HOST="jenkins-csb-rhods-opendatascience.dno.corp.redhat.com"
+
+      OWNER="${REPO_URL%%/*}"
+      REPO="${REPO_URL##*/}"
+      WORKFLOW_OWNER="${WORKFLOW_REPO%%/*}"
+      WORKFLOW_REPO_NAME="${WORKFLOW_REPO##*/}"
+
+      REPO_NAME="${REPO}"
+      FBC_TAG="odh-pr-${PR_NUMBER}-${REPO_NAME}"
+      CORRELATION_ID="eg-$(date +%s)"
+
+      echo "Triggering early-gate test pipeline for PR #${PR_NUMBER}"
+      echo "Repo: ${REPO_NAME}, FBC tag: ${FBC_TAG}, Correlation ID: ${CORRELATION_ID}"
+
+      # ---------------------------------------------------------------
+      # Helper: GitHub API call with auth
+      # ---------------------------------------------------------------
+      gh_api() {
+        local method="$1"
+        local url="$2"
+        shift 2
+        curl -sSf \
+          -X "${method}" \
+          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${@}" \
+          "${url}"
+      }
+
+      # ---------------------------------------------------------------
+      # 1. Record dispatch timestamp and dispatch workflow
+      # ---------------------------------------------------------------
+      DISPATCH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      echo "Dispatching workflow at ${DISPATCH_TIME}"
+
+      gh_api POST \
+        "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${TRIGGER_WORKFLOW}/dispatches" \
+        -d "{\"ref\":\"main\",\"inputs\":{
+          \"repositories\":\"${REPO_NAME}\",
+          \"fbc_tag\":\"${FBC_TAG}\",
+          \"pr_number\":\"${PR_NUMBER}\",
+          \"correlation_id\":\"${CORRELATION_ID}\"
+        }}"
+
+      echo "Workflow dispatched successfully."
+
+      # ---------------------------------------------------------------
+      # 2. Find the triggered run_id (poll up to 5 minutes)
+      # ---------------------------------------------------------------
+      echo "Waiting for workflow run to appear..."
+      RUN_ID=""
+      for attempt in $(seq 1 30); do
+        sleep 10
+        RUNS=$(gh_api GET \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${TRIGGER_WORKFLOW}/runs?per_page=10&event=workflow_dispatch" \
+          2>/dev/null || echo '{"workflow_runs":[]}')
+
+        RUN_ID=$(echo "${RUNS}" | jq -r \
+          --arg since "${DISPATCH_TIME}" \
+          '[.workflow_runs[] | select(.created_at >= $since)] | sort_by(.created_at) | last | .id // empty')
+
+        if [ -n "${RUN_ID}" ]; then
+          echo "Found run ID: ${RUN_ID}"
+          break
+        fi
+        echo "Attempt ${attempt}/30: run not found yet..."
+      done
+
+      if [ -z "${RUN_ID}" ]; then
+        echo "ERROR: Could not find triggered workflow run after 5 minutes."
+        exit 1
+      fi
+
+      # ---------------------------------------------------------------
+      # 3. Wait for workflow run to complete (timeout: 15 minutes)
+      # ---------------------------------------------------------------
+      echo "Waiting for workflow run ${RUN_ID} to complete..."
+      for attempt in $(seq 1 60); do
+        sleep 15
+        RUN_STATUS=$(gh_api GET \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}" \
+          2>/dev/null | jq -r '.status // "unknown"')
+        CONCLUSION=$(gh_api GET \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}" \
+          2>/dev/null | jq -r '.conclusion // ""')
+
+        echo "Attempt ${attempt}/60: status=${RUN_STATUS} conclusion=${CONCLUSION}"
+
+        if [ "${RUN_STATUS}" = "completed" ]; then
+          echo "Workflow run completed with conclusion: ${CONCLUSION}"
+          break
+        fi
+      done
+
+      if [ "${RUN_STATUS}" != "completed" ]; then
+        echo "ERROR: Workflow run ${RUN_ID} did not complete within the timeout."
+        exit 1
+      fi
+
+      # ---------------------------------------------------------------
+      # 4. Extract queue-url from workflow job output (primary) or step logs (fallback)
+      # ---------------------------------------------------------------
+      QUEUE_URL=""
+
+      # Primary: try job named "queue-url" output
+      JOBS=$(gh_api GET \
+        "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}/jobs" \
+        2>/dev/null || echo '{"jobs":[]}')
+
+      QUEUE_JOB_ID=$(echo "${JOBS}" | jq -r \
+        '[.jobs[] | select(.name | test("queue.url|queue_url"; "i"))] | first | .id // empty')
+
+      if [ -n "${QUEUE_JOB_ID}" ]; then
+        JOB_LOGS=$(gh_api GET \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${QUEUE_JOB_ID}/logs" \
+          2>/dev/null || true)
+        QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+" | head -1 || true)
+      fi
+
+      # Fallback: scan all step logs for queue URL pattern
+      if [ -z "${QUEUE_URL}" ]; then
+        echo "Primary extraction failed, scanning all job logs..."
+        ALL_JOB_IDS=$(echo "${JOBS}" | jq -r '.jobs[].id')
+        for JOB_ID in ${ALL_JOB_IDS}; do
+          JOB_LOGS=$(gh_api GET \
+            "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${JOB_ID}/logs" \
+            2>/dev/null || true)
+          QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+" | head -1 || true)
+          if [ -n "${QUEUE_URL}" ]; then
+            echo "Found queue URL in job ${JOB_ID} logs: ${QUEUE_URL}"
+            break
+          fi
+        done
+      fi
+
+      if [ -z "${QUEUE_URL}" ]; then
+        echo "ERROR: Could not extract Jenkins queue URL from workflow run ${RUN_ID}."
+        echo "Workflow conclusion was: ${CONCLUSION}"
+        exit 1
+      fi
+
+      echo "Jenkins queue URL: ${QUEUE_URL}"
+
+      # ---------------------------------------------------------------
+      # 5. Post queue-url-comment on the PR
+      # ---------------------------------------------------------------
+      COMMENT_BODY=$(printf '<!-- early-gate-queue-url queue_url=%s -->\n**Early Gate Test - Job Queued**\n\nJenkins job has been queued and will start shortly.\n\n- **Queue URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s\n\n_This comment will be replaced once the job starts._' \
+        "${QUEUE_URL}" "${QUEUE_URL}" "${FBC_TAG}" "${CORRELATION_ID}")
+
+      gh_api POST \
+        "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" \
+        -d "{\"body\":$(printf '%s' "${COMMENT_BODY}" | jq -Rs .)}"
+
+      echo "Posted queue-url-comment on PR #${PR_NUMBER}"
+
+      # ---------------------------------------------------------------
+      # 6. Write results
+      # ---------------------------------------------------------------
+      printf '%s' "${QUEUE_URL}" > "$(results.queue-url.path)"
+      printf '%s' "${CORRELATION_ID}" > "$(results.correlation-id.path)"

@@ -1,0 +1,177 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: early-gate-test-pipeline
+spec:
+  description: |
+    Triggers and monitors an early-gate smoke test Jenkins job for a pull request.
+    Verifies that the required Quay images exist, checks for any ongoing jobs from
+    a previous (interrupted) run to ensure idempotency, triggers the Jenkins job via
+    a GitHub workflow dispatch, monitors it to completion, and posts the test results
+    back to the PR as comments.
+
+  params:
+  # --- General ---
+  - name: git-url
+    type: string
+    description: Source Repository URL
+  - name: revision
+    type: string
+    description: Revision of the Source Repository
+    default: ""
+  - name: pipeline-type
+    type: string
+    description: Type of pipeline execution (push or pull-request)
+    default: "pull-request"
+  - name: image-expires-after
+    type: string
+    description: Image tag expiration time (e.g. 1h, 2d, 3w)
+    default: "7d"
+
+  # --- GitHub workflow config ---
+  - name: github-workflow-repo
+    type: string
+    description: Owner/repo of the GitHub repo containing the trigger and monitor workflows
+    default: red-hat-data-services/rhods-devops-infra
+  - name: trigger-workflow-file
+    type: string
+    description: Workflow filename for triggering the Jenkins job
+    default: dummy-earlygate-smoke-trigger.yaml
+  - name: monitor-workflow-file
+    type: string
+    description: Workflow filename for monitoring the Jenkins job
+    default: monitor-jenkins-job.yaml
+
+  # --- Polling intervals ---
+  - name: queue-url-poll-interval
+    type: string
+    description: Seconds between monitor-workflow invocations while resolving the Jenkins job URL from the queue
+    default: "30"
+  - name: job-status-poll-interval
+    type: string
+    description: Seconds between monitor-workflow invocations while polling for Jenkins job completion
+    default: "30"
+
+  # --- Secret config ---
+  - name: github-token-secret-name
+    type: string
+    description: Name of the Kubernetes secret containing the GitHub token for all GitHub operations
+    default: early-gate-secrets
+  - name: github-token-secret-key
+    type: string
+    description: Key in the secret that holds the GitHub token
+    default: GITHUB_TOKEN
+
+  # ==========================================================================
+  # TASKS
+  # ==========================================================================
+  tasks:
+
+  # --------------------------------------------------------------------------
+  # 1. Check prerequisites — verify both quay images exist for this PR
+  # --------------------------------------------------------------------------
+  - name: check-prerequisites
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: e2e-early-gate/tasks/check-prerequisites.yaml
+    params:
+    - name: github-token-secret-name
+      value: $(params.github-token-secret-name)
+    - name: github-token-secret-key
+      value: $(params.github-token-secret-key)
+
+  # --------------------------------------------------------------------------
+  # 2. Check for ongoing jobs — scan PR comments for idempotency
+  # --------------------------------------------------------------------------
+  - name: check-ongoing-jobs
+    runAfter:
+    - check-prerequisites
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: e2e-early-gate/tasks/check-ongoing-jobs.yaml
+    params:
+    - name: github-token-secret-name
+      value: $(params.github-token-secret-name)
+    - name: github-token-secret-key
+      value: $(params.github-token-secret-key)
+
+  # --------------------------------------------------------------------------
+  # 3. Trigger test pipeline — dispatch GitHub workflow, post queue-url-comment
+  #    Skipped when a previous run left an active queue-url or job-url comment
+  # --------------------------------------------------------------------------
+  - name: trigger-test-pipeline
+    runAfter:
+    - check-ongoing-jobs
+    when:
+    - input: "$(tasks.check-ongoing-jobs.results.resume-from)"
+      operator: in
+      values: ["none"]
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: e2e-early-gate/tasks/trigger-test-pipeline.yaml
+    params:
+    - name: github-workflow-repo
+      value: $(params.github-workflow-repo)
+    - name: trigger-workflow-file
+      value: $(params.trigger-workflow-file)
+    - name: github-token-secret-name
+      value: $(params.github-token-secret-name)
+    - name: github-token-secret-key
+      value: $(params.github-token-secret-key)
+
+  # --------------------------------------------------------------------------
+  # 4. Monitor Jenkins job — resolve job URL, poll to completion, post results
+  #    Always runs (after check-ongoing-jobs so it isn't skipped when trigger is skipped)
+  # --------------------------------------------------------------------------
+  - name: monitor-jenkins-job
+    runAfter:
+    - check-ongoing-jobs
+    - trigger-test-pipeline
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: e2e-early-gate/tasks/monitor-jenkins-job.yaml
+    params:
+    # queue/job URL from check-ongoing-jobs (non-empty only when resuming a previous run).
+    # For fresh runs the monitor task scans PR comments for the queue-url-comment posted
+    # by trigger-test-pipeline, avoiding any reference to potentially-skipped task results.
+    - name: queue-url-from-check
+      value: $(tasks.check-ongoing-jobs.results.queue-url)
+    - name: job-url-from-check
+      value: $(tasks.check-ongoing-jobs.results.job-url)
+    - name: github-workflow-repo
+      value: $(params.github-workflow-repo)
+    - name: monitor-workflow-file
+      value: $(params.monitor-workflow-file)
+    - name: queue-url-poll-interval
+      value: $(params.queue-url-poll-interval)
+    - name: job-status-poll-interval
+      value: $(params.job-status-poll-interval)
+    - name: github-token-secret-name
+      value: $(params.github-token-secret-name)
+    - name: github-token-secret-key
+      value: $(params.github-token-secret-key)

@@ -1,0 +1,132 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: check-ongoing-jobs
+  labels:
+    app.kubernetes.io/version: "0.1"
+spec:
+  description: |
+    Scans PR comments in descending order to detect a previously triggered but
+    incomplete early-gate Jenkins job, enabling idempotent pipeline execution.
+    Emits resume-from, queue-url, and job-url results for downstream tasks.
+  params:
+  - name: github-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token
+    type: string
+    default: early-gate-secrets
+  - name: github-token-secret-key
+    description: Key in the secret that holds the GitHub token
+    type: string
+    default: GITHUB_TOKEN
+  results:
+  - name: resume-from
+    description: "One of: none, queue-url, job-url"
+  - name: queue-url
+    description: Jenkins queue URL extracted from a previous queue-url-comment (empty if not found)
+  - name: job-url
+    description: Jenkins job URL extracted from a previous job-url-comment (empty if not found)
+  steps:
+  - name: scan-pr-comments
+    image: quay.io/konflux-ci/konflux-test:stable
+    env:
+    - name: PR_NUMBER
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.labels['pipelinesascode.tekton.dev/pull-request']
+    - name: REPO_URL
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: $(params.github-token-secret-name)
+          key: $(params.github-token-secret-key)
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+
+      # REPO_URL is in format "org/repo"
+      OWNER="${REPO_URL%%/*}"
+      REPO="${REPO_URL##*/}"
+
+      echo "Scanning comments on PR #${PR_NUMBER} in ${OWNER}/${REPO}"
+
+      # Get the current authenticated user login
+      CURRENT_USER=$(curl -sSf \
+        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/user" | jq -r '.login')
+      echo "Authenticated as: ${CURRENT_USER}"
+
+      # Default outputs
+      RESUME_FROM="none"
+      FOUND_QUEUE_URL=""
+      FOUND_JOB_URL=""
+
+      PAGE=1
+      DONE=false
+
+      while [ "${DONE}" = "false" ]; do
+        RESPONSE=$(curl -sSf \
+          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}&sort=created&direction=desc")
+
+        COUNT=$(echo "${RESPONSE}" | jq 'length')
+        if [ "${COUNT}" -eq 0 ]; then
+          break
+        fi
+
+        while IFS= read -r COMMENT_JSON; do
+          USER=$(echo "${COMMENT_JSON}" | jq -r '.user.login')
+          BODY=$(echo "${COMMENT_JSON}" | jq -r '.body')
+          COMMENT_ID=$(echo "${COMMENT_JSON}" | jq -r '.id')
+
+          # Only process comments made by the current authenticated user
+          if [ "${USER}" != "${CURRENT_USER}" ]; then
+            continue
+          fi
+
+          # Check for job-completion marker first — if found, stop (job is done, fresh start)
+          if echo "${BODY}" | grep -q "^<!-- early-gate-job-complete "; then
+            echo "Found job-completion-comment (id=${COMMENT_ID}), job previously completed — starting fresh."
+            DONE=true
+            break
+          fi
+
+          # Check for job-url marker — job was triggered but pipeline died before completion
+          if echo "${BODY}" | grep -q "^<!-- early-gate-job-url "; then
+            FOUND_JOB_URL=$(echo "${BODY}" | grep -oP '(?<=job_url=)[^ >]+' | head -1)
+            echo "Found job-url-comment (id=${COMMENT_ID}): ${FOUND_JOB_URL}"
+            RESUME_FROM="job-url"
+            DONE=true
+            break
+          fi
+
+          # Check for queue-url marker — job was queued but pipeline died before job started
+          if echo "${BODY}" | grep -q "^<!-- early-gate-queue-url "; then
+            FOUND_QUEUE_URL=$(echo "${BODY}" | grep -oP '(?<=queue_url=)[^ >]+' | head -1)
+            echo "Found queue-url-comment (id=${COMMENT_ID}): ${FOUND_QUEUE_URL}"
+            RESUME_FROM="queue-url"
+            DONE=true
+            break
+          fi
+
+        done < <(echo "${RESPONSE}" | jq -c '.[]')
+
+        if [ "${DONE}" = "true" ]; then
+          break
+        fi
+
+        PAGE=$((PAGE + 1))
+      done
+
+      echo "resume-from: ${RESUME_FROM}"
+      echo "queue-url: ${FOUND_QUEUE_URL}"
+      echo "job-url: ${FOUND_JOB_URL}"
+
+      printf '%s' "${RESUME_FROM}" > "$(results.resume-from.path)"
+      printf '%s' "${FOUND_QUEUE_URL}" > "$(results.queue-url.path)"
+      printf '%s' "${FOUND_JOB_URL}" > "$(results.job-url.path)"
