@@ -19,14 +19,22 @@ spec:
     description: Workflow filename to dispatch
     type: string
     default: dummy-earlygate-smoke-trigger.yaml
-  - name: github-token-secret-name
-    description: Name of the Kubernetes secret containing the GitHub token
+  - name: workflow-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token for interacting with GitHub Actions workflows
     type: string
-    default: early-gate-secrets
-  - name: github-token-secret-key
-    description: Key in the secret that holds the GitHub token
+    default: rhods-ci
+  - name: workflow-token-secret-key
+    description: Key in the secret that holds the GitHub token for workflow operations
     type: string
-    default: GITHUB_TOKEN
+    default: secret
+  - name: pr-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token for PR comment operations
+    type: string
+    default: odh-github-secret
+  - name: pr-token-secret-key
+    description: Key in the secret that holds the GitHub token for PR comment operations
+    type: string
+    default: commenter-token
   results:
   - name: queue-url
     description: Jenkins queue URL for the triggered job
@@ -44,11 +52,16 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
-    - name: GITHUB_TOKEN
+    - name: WORKFLOW_GITHUB_TOKEN
       valueFrom:
         secretKeyRef:
-          name: $(params.github-token-secret-name)
-          key: $(params.github-token-secret-key)
+          name: $(params.workflow-token-secret-name)
+          key: $(params.workflow-token-secret-key)
+    - name: PR_GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: $(params.pr-token-secret-name)
+          key: $(params.pr-token-secret-key)
     - name: WORKFLOW_REPO
       value: $(params.github-workflow-repo)
     - name: TRIGGER_WORKFLOW
@@ -72,15 +85,27 @@ spec:
       echo "Repo: ${REPO_NAME}, FBC tag: ${FBC_TAG}, Correlation ID: ${CORRELATION_ID}"
 
       # ---------------------------------------------------------------
-      # Helper: GitHub API call with auth
+      # Helper: GitHub API calls with separate tokens per operation type
       # ---------------------------------------------------------------
-      gh_api() {
+      gh_workflow_api() {
         local method="$1"
         local url="$2"
         shift 2
         curl -sSf \
           -X "${method}" \
-          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Authorization: Bearer ${WORKFLOW_GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${@}" \
+          "${url}"
+      }
+
+      gh_pr_api() {
+        local method="$1"
+        local url="$2"
+        shift 2
+        curl -sSf \
+          -X "${method}" \
+          -H "Authorization: Bearer ${PR_GITHUB_TOKEN}" \
           -H "Accept: application/vnd.github+json" \
           "${@}" \
           "${url}"
@@ -92,7 +117,7 @@ spec:
       DISPATCH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
       echo "Dispatching workflow at ${DISPATCH_TIME}"
 
-      gh_api POST \
+      gh_workflow_api POST \
         "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${TRIGGER_WORKFLOW}/dispatches" \
         -d "{\"ref\":\"main\",\"inputs\":{
           \"repositories\":\"${REPO_NAME}\",
@@ -110,7 +135,7 @@ spec:
       RUN_ID=""
       for attempt in $(seq 1 30); do
         sleep 10
-        RUNS=$(gh_api GET \
+        RUNS=$(gh_workflow_api GET \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${TRIGGER_WORKFLOW}/runs?per_page=10&event=workflow_dispatch" \
           2>/dev/null || echo '{"workflow_runs":[]}')
 
@@ -136,10 +161,10 @@ spec:
       echo "Waiting for workflow run ${RUN_ID} to complete..."
       for attempt in $(seq 1 60); do
         sleep 15
-        RUN_STATUS=$(gh_api GET \
+        RUN_STATUS=$(gh_workflow_api GET \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}" \
           2>/dev/null | jq -r '.status // "unknown"')
-        CONCLUSION=$(gh_api GET \
+        CONCLUSION=$(gh_workflow_api GET \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}" \
           2>/dev/null | jq -r '.conclusion // ""')
 
@@ -162,7 +187,7 @@ spec:
       QUEUE_URL=""
 
       # Primary: try job named "queue-url" output
-      JOBS=$(gh_api GET \
+      JOBS=$(gh_workflow_api GET \
         "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}/jobs" \
         2>/dev/null || echo '{"jobs":[]}')
 
@@ -170,7 +195,7 @@ spec:
         '[.jobs[] | select(.name | test("queue.url|queue_url"; "i"))] | first | .id // empty')
 
       if [ -n "${QUEUE_JOB_ID}" ]; then
-        JOB_LOGS=$(gh_api GET \
+        JOB_LOGS=$(gh_workflow_api GET \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${QUEUE_JOB_ID}/logs" \
           2>/dev/null || true)
         QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+" | head -1 || true)
@@ -181,7 +206,7 @@ spec:
         echo "Primary extraction failed, scanning all job logs..."
         ALL_JOB_IDS=$(echo "${JOBS}" | jq -r '.jobs[].id')
         for JOB_ID in ${ALL_JOB_IDS}; do
-          JOB_LOGS=$(gh_api GET \
+          JOB_LOGS=$(gh_workflow_api GET \
             "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${JOB_ID}/logs" \
             2>/dev/null || true)
           QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+" | head -1 || true)
@@ -206,7 +231,7 @@ spec:
       COMMENT_BODY=$(printf '<!-- early-gate-queue-url queue_url=%s -->\n**Early Gate Test - Job Queued**\n\nJenkins job has been queued and will start shortly.\n\n- **Queue URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s\n\n_This comment will be replaced once the job starts._' \
         "${QUEUE_URL}" "${QUEUE_URL}" "${FBC_TAG}" "${CORRELATION_ID}")
 
-      gh_api POST \
+      gh_pr_api POST \
         "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" \
         -d "{\"body\":$(printf '%s' "${COMMENT_BODY}" | jq -Rs .)}"
 

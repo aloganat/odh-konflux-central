@@ -28,6 +28,10 @@ spec:
     description: Workflow filename to dispatch for monitoring
     type: string
     default: monitor-jenkins-job.yaml
+  - name: delete-intermediate-comments
+    description: "Delete intermediate PR comments (queue-url-comment, job-url-comment) once they are superseded. Set to 'true' to enable deletion; defaults to 'false' (comments are kept)."
+    type: string
+    default: "false"
   - name: queue-url-poll-interval
     description: Seconds to wait between monitor-workflow invocations while resolving the Jenkins job URL from the queue (Phase A)
     type: string
@@ -36,14 +40,22 @@ spec:
     description: Seconds to wait between monitor-workflow invocations while polling for Jenkins job completion (Phase B)
     type: string
     default: "30"
-  - name: github-token-secret-name
-    description: Name of the Kubernetes secret containing the GitHub token
+  - name: workflow-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token for interacting with GitHub Actions workflows
     type: string
-    default: early-gate-secrets
-  - name: github-token-secret-key
-    description: Key in the secret that holds the GitHub token
+    default: rhods-ci
+  - name: workflow-token-secret-key
+    description: Key in the secret that holds the GitHub token for workflow operations
     type: string
-    default: GITHUB_TOKEN
+    default: secret
+  - name: pr-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token for PR comment operations
+    type: string
+    default: odh-github-secret
+  - name: pr-token-secret-key
+    description: Key in the secret that holds the GitHub token for PR comment operations
+    type: string
+    default: commenter-token
   steps:
   - name: install-yq
     image: quay.io/konflux-ci/konflux-test:stable
@@ -66,11 +78,16 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
-    - name: GITHUB_TOKEN
+    - name: WORKFLOW_GITHUB_TOKEN
       valueFrom:
         secretKeyRef:
-          name: $(params.github-token-secret-name)
-          key: $(params.github-token-secret-key)
+          name: $(params.workflow-token-secret-name)
+          key: $(params.workflow-token-secret-key)
+    - name: PR_GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: $(params.pr-token-secret-name)
+          key: $(params.pr-token-secret-key)
     - name: WORKFLOW_REPO
       value: $(params.github-workflow-repo)
     - name: MONITOR_WORKFLOW
@@ -79,6 +96,8 @@ spec:
       value: $(params.queue-url-from-check)
     - name: JOB_URL_FROM_CHECK
       value: $(params.job-url-from-check)
+    - name: DELETE_INTERMEDIATE_COMMENTS
+      value: $(params.delete-intermediate-comments)
     - name: QUEUE_URL_POLL_INTERVAL
       value: $(params.queue-url-poll-interval)
     - name: JOB_STATUS_POLL_INTERVAL
@@ -107,13 +126,25 @@ spec:
       # Helper functions
       # ---------------------------------------------------------------
 
-      gh_api() {
+      gh_workflow_api() {
         local method="$1"
         local url="$2"
         shift 2
         curl -sSf \
           -X "${method}" \
-          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Authorization: Bearer ${WORKFLOW_GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${@}" \
+          "${url}"
+      }
+
+      gh_pr_api() {
+        local method="$1"
+        local url="$2"
+        shift 2
+        curl -sSf \
+          -X "${method}" \
+          -H "Authorization: Bearer ${PR_GITHUB_TOKEN}" \
           -H "Accept: application/vnd.github+json" \
           "${@}" \
           "${url}"
@@ -129,7 +160,7 @@ spec:
         local DISPATCH_TIME
         DISPATCH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        gh_api POST \
+        gh_workflow_api POST \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${MONITOR_WORKFLOW}/dispatches" \
           -d "{\"ref\":\"main\",\"inputs\":{\"${input_key}\":\"${input_value}\"}}" \
           2>/dev/null || return 1
@@ -139,7 +170,7 @@ spec:
         for attempt in $(seq 1 20); do
           sleep 10
           local RUNS
-          RUNS=$(gh_api GET \
+          RUNS=$(gh_workflow_api GET \
             "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${MONITOR_WORKFLOW}/runs?per_page=5&event=workflow_dispatch" \
             2>/dev/null || echo '{"workflow_runs":[]}')
           RUN_ID=$(echo "${RUNS}" | jq -r \
@@ -157,7 +188,7 @@ spec:
         for attempt in $(seq 1 40); do
           sleep 15
           local RUN_STATUS
-          RUN_STATUS=$(gh_api GET \
+          RUN_STATUS=$(gh_workflow_api GET \
             "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}" \
             2>/dev/null | jq -r '.status // "unknown"')
           if [ "${RUN_STATUS}" = "completed" ]; then
@@ -177,7 +208,7 @@ spec:
         local OUTPUT_NAME="$2"
 
         local JOBS
-        JOBS=$(gh_api GET \
+        JOBS=$(gh_workflow_api GET \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}/jobs" \
           2>/dev/null || echo '{"jobs":[]}')
 
@@ -186,7 +217,7 @@ spec:
 
         for JOB_ID in ${ALL_JOB_IDS}; do
           local JOB_LOGS
-          JOB_LOGS=$(gh_api GET \
+          JOB_LOGS=$(gh_workflow_api GET \
             "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${JOB_ID}/logs" \
             2>/dev/null || true)
           local VALUE
@@ -203,15 +234,15 @@ spec:
       # Posts a comment on the current PR.
       post_pr_comment() {
         local BODY="$1"
-        gh_api POST \
+        gh_pr_api POST \
           "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" \
           -d "{\"body\":$(echo "${BODY}" | jq -Rs .)}" \
           2>/dev/null || echo "WARNING: Failed to post PR comment (non-fatal)"
       }
 
-      # Gets current authenticated user login
+      # Gets the login of the user owning the PR token (used to filter comments by author).
       get_current_user() {
-        gh_api GET "https://api.github.com/user" 2>/dev/null | jq -r '.login'
+        gh_pr_api GET "https://api.github.com/user" 2>/dev/null | jq -r '.login'
       }
 
       # Deletes a PR comment matching the given marker type, validating the embedded value.
@@ -227,7 +258,7 @@ spec:
         local PAGE=1
         while true; do
           local RESPONSE
-          RESPONSE=$(gh_api GET \
+          RESPONSE=$(gh_pr_api GET \
             "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}&sort=created&direction=desc" \
             2>/dev/null || echo '[]')
 
@@ -255,7 +286,7 @@ spec:
           done < <(echo "${RESPONSE}" | jq -c '.[]')
 
           if [ -n "${FOUND_ID}" ]; then
-            gh_api DELETE \
+            gh_pr_api DELETE \
               "https://api.github.com/repos/${OWNER}/${REPO}/issues/comments/${FOUND_ID}" \
               2>/dev/null || echo "WARNING: Failed to delete comment ${FOUND_ID} (ignoring)"
             echo "Deleted ${MARKER_TYPE} comment (id=${FOUND_ID})"
@@ -282,7 +313,7 @@ spec:
           echo "No queue URL from check-ongoing-jobs. Scanning PR comments for fresh queue-url-comment..."
           CURRENT_USER=$(get_current_user)
           for page in 1 2 3; do
-            PR_COMMENTS=$(gh_api GET \
+            PR_COMMENTS=$(gh_pr_api GET \
               "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${page}&sort=created&direction=desc" \
               2>/dev/null || echo '[]')
             while IFS= read -r CJSON; do
@@ -337,8 +368,10 @@ spec:
         post_pr_comment "${JOB_COMMENT_BODY}"
         echo "Posted job-url-comment on PR #${PR_NUMBER}"
 
-        # Delete the queue-url-comment now that the job has started
-        delete_comment_by_marker "early-gate-queue-url" "queue_url" "${QUEUE_URL}"
+        # Delete the queue-url-comment now that the job has started (only if configured)
+        if [ "${DELETE_INTERMEDIATE_COMMENTS}" = "true" ]; then
+          delete_comment_by_marker "early-gate-queue-url" "queue_url" "${QUEUE_URL}"
+        fi
       else
         echo "=== Phase A: Skipped (resuming with known job URL: ${JENKINS_JOB_URL}) ==="
       fi
@@ -453,8 +486,10 @@ spec:
       post_pr_comment "${COMPLETION_BODY}"
       echo "Posted job-completion-comment on PR #${PR_NUMBER}"
 
-      # Delete the job-url-comment now that we have the final result
-      delete_comment_by_marker "early-gate-job-url" "job_url" "${JENKINS_JOB_URL}"
+      # Delete the job-url-comment now that we have the final result (only if configured)
+      if [ "${DELETE_INTERMEDIATE_COMMENTS}" = "true" ]; then
+        delete_comment_by_marker "early-gate-job-url" "job_url" "${JENKINS_JOB_URL}"
+      fi
 
       # ---------------------------------------------------------------
       # Determine final pipeline exit code
