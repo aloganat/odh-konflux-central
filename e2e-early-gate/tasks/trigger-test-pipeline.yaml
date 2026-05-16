@@ -52,6 +52,10 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
+    - name: REPO_ORG
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-org']
     - name: WORKFLOW_GITHUB_TOKEN
       valueFrom:
         secretKeyRef:
@@ -72,8 +76,8 @@ spec:
 
       JENKINS_HOST="jenkins-csb-rhods-opendatascience.dno.corp.redhat.com"
 
-      OWNER="${REPO_URL%%/*}"
-      REPO="${REPO_URL##*/}"
+      OWNER="${REPO_ORG}"
+      REPO="${REPO_URL}"
       WORKFLOW_OWNER="${WORKFLOW_REPO%%/*}"
       WORKFLOW_REPO_NAME="${WORKFLOW_REPO##*/}"
 

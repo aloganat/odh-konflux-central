@@ -46,6 +46,10 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
+    - name: REPO_ORG
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-org']
     - name: WORKFLOW_GITHUB_TOKEN
       valueFrom:
         secretKeyRef:
@@ -60,9 +64,8 @@ spec:
       #!/bin/bash
       set -euo pipefail
 
-      # REPO_URL is in format "org/repo"
-      OWNER="${REPO_URL%%/*}"
-      REPO="${REPO_URL##*/}"
+      OWNER="${REPO_ORG}"
+      REPO="${REPO_URL}"
 
       gh_pr_api() {
         local method="$1"
