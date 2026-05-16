@@ -57,19 +57,19 @@ spec:
   - name: workflow-token-secret-name
     type: string
     description: Name of the Kubernetes secret containing the GitHub token for GitHub Actions workflow operations
-    default: early-gate-secrets
+    default: rhods-ci
   - name: workflow-token-secret-key
     type: string
     description: Key in the secret that holds the GitHub token for workflow operations
-    default: GITHUB_WORKFLOW_TOKEN
+    default: secret
   - name: pr-token-secret-name
     type: string
     description: Name of the Kubernetes secret containing the GitHub token for PR comment operations
-    default: early-gate-secrets
+    default: odh-github-secret
   - name: pr-token-secret-key
     type: string
     description: Key in the secret that holds the GitHub token for PR comment operations
-    default: GITHUB_PR_TOKEN
+    default: commenter-token
 
   # ==========================================================================
   # TASKS
