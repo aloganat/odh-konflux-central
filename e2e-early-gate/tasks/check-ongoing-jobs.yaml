@@ -11,14 +11,22 @@ spec:
     incomplete early-gate Jenkins job, enabling idempotent pipeline execution.
     Emits resume-from, queue-url, and job-url results for downstream tasks.
   params:
-  - name: github-token-secret-name
-    description: Name of the Kubernetes secret containing the GitHub token
+  - name: workflow-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token for interacting with GitHub Actions workflows
     type: string
-    default: early-gate-secrets
-  - name: github-token-secret-key
-    description: Key in the secret that holds the GitHub token
+    default: rhods-ci
+  - name: workflow-token-secret-key
+    description: Key in the secret that holds the GitHub token for workflow operations
     type: string
-    default: GITHUB_TOKEN
+    default: secret
+  - name: pr-token-secret-name
+    description: Name of the Kubernetes secret containing the GitHub token for PR comment operations
+    type: string
+    default: odh-github-secret
+  - name: pr-token-secret-key
+    description: Key in the secret that holds the GitHub token for PR comment operations
+    type: string
+    default: commenter-token
   results:
   - name: resume-from
     description: "One of: none, queue-url, job-url"
@@ -38,11 +46,16 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
-    - name: GITHUB_TOKEN
+    - name: WORKFLOW_GITHUB_TOKEN
       valueFrom:
         secretKeyRef:
-          name: $(params.github-token-secret-name)
-          key: $(params.github-token-secret-key)
+          name: $(params.workflow-token-secret-name)
+          key: $(params.workflow-token-secret-key)
+    - name: PR_GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: $(params.pr-token-secret-name)
+          key: $(params.pr-token-secret-key)
     script: |
       #!/bin/bash
       set -euo pipefail
@@ -51,13 +64,22 @@ spec:
       OWNER="${REPO_URL%%/*}"
       REPO="${REPO_URL##*/}"
 
+      gh_pr_api() {
+        local method="$1"
+        local url="$2"
+        shift 2
+        curl -sSf \
+          -X "${method}" \
+          -H "Authorization: Bearer ${PR_GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${@}" \
+          "${url}"
+      }
+
       echo "Scanning comments on PR #${PR_NUMBER} in ${OWNER}/${REPO}"
 
-      # Get the current authenticated user login
-      CURRENT_USER=$(curl -sSf \
-        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/user" | jq -r '.login')
+      # Get the current authenticated user login (identifies comments made by this token)
+      CURRENT_USER=$(gh_pr_api GET "https://api.github.com/user" | jq -r '.login')
       echo "Authenticated as: ${CURRENT_USER}"
 
       # Default outputs
@@ -69,9 +91,7 @@ spec:
       DONE=false
 
       while [ "${DONE}" = "false" ]; do
-        RESPONSE=$(curl -sSf \
-          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-          -H "Accept: application/vnd.github+json" \
+        RESPONSE=$(gh_pr_api GET \
           "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}&sort=created&direction=desc")
 
         COUNT=$(echo "${RESPONSE}" | jq 'length')
