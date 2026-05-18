@@ -249,6 +249,9 @@ spec:
       declare -A CORR_COMPLETE
       declare -A CORR_LATEST_TIME
 
+      FIRST_CORR_ID=""
+      DONE_SCANNING=false
+
       PAGE=1
       while true; do
         RESPONSE=$(gh_pr_api GET \
@@ -288,14 +291,25 @@ spec:
             fi
           fi
 
-          # Track the most recent comment time per correlation-id
           if [ -n "${CORR_ID}" ]; then
+            if [ -z "${FIRST_CORR_ID}" ]; then
+              FIRST_CORR_ID="${CORR_ID}"
+            elif [ "${CORR_ID}" != "${FIRST_CORR_ID}" ]; then
+              echo "  Reached older correlation-id ${CORR_ID}, stopping scan."
+              DONE_SCANNING=true
+              break
+            fi
+
             if [ -z "${CORR_LATEST_TIME[${CORR_ID}]:-}" ] || [[ "${CREATED_AT}" > "${CORR_LATEST_TIME[${CORR_ID}]}" ]]; then
               CORR_LATEST_TIME["${CORR_ID}"]="${CREATED_AT}"
             fi
           fi
 
         done < <(echo "${RESPONSE}" | jq -c '.[]')
+
+        if [ "${DONE_SCANNING}" = true ]; then
+          break
+        fi
 
         PAGE=$((PAGE + 1))
         # Safety limit: scan up to 500 comments
