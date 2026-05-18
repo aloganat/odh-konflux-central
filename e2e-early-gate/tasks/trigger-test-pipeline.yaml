@@ -43,6 +43,10 @@ spec:
     description: Key in the secret that holds the Jenkins base URL (e.g. https://host)
     type: string
     default: jenkins-url
+  - name: delete-intermediate-comments
+    description: "When true, intermediate PR comments include a note that they will be replaced"
+    type: string
+    default: "false"
   results:
   - name: queue-url
     description: Relative Jenkins queue path for the triggered job (e.g. /queue/item/12345)
@@ -83,6 +87,8 @@ spec:
       value: $(params.github-workflow-repo)
     - name: TRIGGER_WORKFLOW
       value: $(params.trigger-workflow-file)
+    - name: DELETE_INTERMEDIATE_COMMENTS
+      value: $(params.delete-intermediate-comments)
     script: |
       #!/bin/bash
       set -euo pipefail
@@ -253,7 +259,12 @@ spec:
       # ---------------------------------------------------------------
       # 5. Post queue-url-comment on the PR (relative path only)
       # ---------------------------------------------------------------
-      COMMENT_BODY=$(printf '<!-- early-gate-queue-url queue_url=%s -->\n**Early Gate Test - Job Queued**\n\nJenkins job has been queued and will start shortly.\n\n- **Queue URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s\n\n_This comment will be replaced once the job starts._' \
+      REPLACE_NOTE=""
+      if [ "${DELETE_INTERMEDIATE_COMMENTS}" = "true" ]; then
+        REPLACE_NOTE='\n\n_This comment will be replaced once the job starts._'
+      fi
+
+      COMMENT_BODY=$(printf '<!-- early-gate-queue-url queue_url=%s -->\n**Early Gate Test - Job Queued**\n\nJenkins job has been queued and will start shortly.\n\n- **Queue URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s'"${REPLACE_NOTE}" \
         "${QUEUE_URL_RELATIVE}" "${QUEUE_URL_RELATIVE}" "${FBC_TAG}" "${CORRELATION_ID}")
 
       gh_pr_api POST \

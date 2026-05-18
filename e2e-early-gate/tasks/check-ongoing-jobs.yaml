@@ -9,8 +9,20 @@ spec:
   description: |
     Scans PR comments in descending order to detect a previously triggered but
     incomplete early-gate Jenkins job, enabling idempotent pipeline execution.
+    When an unresolved queue-url or job-url is found, dispatches the Monitor
+    Jenkins Job workflow to verify the job is still running before deciding to
+    resume. If the job has already completed, returns resume-from=none so a
+    fresh job is triggered.
     Emits resume-from, queue-url, and job-url results for downstream tasks.
   params:
+  - name: github-workflow-repo
+    description: Owner/repo of the GitHub repo containing the monitor workflow
+    type: string
+    default: red-hat-data-services/rhods-devops-infra
+  - name: monitor-workflow-file
+    description: Workflow filename for monitoring the Jenkins job
+    type: string
+    default: monitor-jenkins-job.yaml
   - name: workflow-token-secret-name
     description: Name of the Kubernetes secret containing the GitHub token for interacting with GitHub Actions workflows
     type: string
@@ -27,13 +39,21 @@ spec:
     description: Key in the secret that holds the GitHub token for PR comment operations
     type: string
     default: commenter-token
+  - name: jenkins-url-secret-name
+    description: Name of the Kubernetes secret containing the Jenkins base URL
+    type: string
+    default: rhods-ci
+  - name: jenkins-url-secret-key
+    description: Key in the secret that holds the Jenkins base URL (e.g. https://host)
+    type: string
+    default: jenkins-url
   results:
   - name: resume-from
     description: "One of: none, queue-url, job-url"
   - name: queue-url
-    description: Relative Jenkins queue path from a previous queue-url-comment (empty if not found)
+    description: Relative Jenkins queue path from a previous queue-url-comment (empty if not found or job already completed)
   - name: job-url
-    description: Relative Jenkins job path from a previous job-url-comment (empty if not found)
+    description: Relative Jenkins job path from a previous job-url-comment (empty if not found or job already completed)
   steps:
   - name: scan-pr-comments
     image: quay.io/konflux-ci/konflux-test:stable
@@ -60,12 +80,22 @@ spec:
         secretKeyRef:
           name: $(params.pr-token-secret-name)
           key: $(params.pr-token-secret-key)
+    - name: JENKINS_BASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: $(params.jenkins-url-secret-name)
+          key: $(params.jenkins-url-secret-key)
+    - name: WORKFLOW_REPO
+      value: $(params.github-workflow-repo)
+    - name: MONITOR_WORKFLOW
+      value: $(params.monitor-workflow-file)
     script: |
       #!/bin/bash
       set -euo pipefail
 
       OWNER="${REPO_ORG}"
       REPO="${REPO_URL}"
+      JENKINS_BASE_URL="${JENKINS_BASE_URL%/}"
 
       gh_pr_api() {
         local method="$1"
@@ -77,6 +107,110 @@ spec:
           -H "Accept: application/vnd.github+json" \
           "${@}" \
           "${url}"
+      }
+
+      gh_workflow_api() {
+        local method="$1"
+        local url="$2"
+        shift 2
+        curl -sSfL \
+          -X "${method}" \
+          -H "Authorization: Bearer ${WORKFLOW_GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${@}" \
+          "${url}"
+      }
+
+      # Dispatches the monitor workflow, waits for completion, and extracts a
+      # named output from the job logs. Returns the value on stdout.
+      # Returns non-zero if the dispatch, run, or extraction fails.
+      dispatch_and_get_output() {
+        local input_key="$1"
+        local input_value="$2"
+        local output_name="$3"
+
+        local DISPATCH_TIME
+        DISPATCH_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        gh_workflow_api POST \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${MONITOR_WORKFLOW}/dispatches" \
+          -d "{\"ref\":\"main\",\"inputs\":{\"${input_key}\":\"${input_value}\"}}" \
+          2>/dev/null || return 1
+
+        # Find the triggered run (poll up to ~3 minutes)
+        local RUN_ID=""
+        for attempt in $(seq 1 20); do
+          sleep 10
+          local RUNS
+          RUNS=$(gh_workflow_api GET \
+            "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${MONITOR_WORKFLOW}/runs?per_page=5&event=workflow_dispatch" \
+            2>/dev/null || echo '{"workflow_runs":[]}')
+          RUN_ID=$(echo "${RUNS}" | jq -r \
+            --arg since "${DISPATCH_TIME}" \
+            '[.workflow_runs[] | select(.created_at >= $since)] | sort_by(.created_at) | last | .id // empty')
+          if [ -n "${RUN_ID}" ]; then break; fi
+        done
+
+        if [ -z "${RUN_ID}" ]; then
+          echo "Could not find dispatched workflow run" >&2
+          return 1
+        fi
+
+        # Wait for completion (poll up to ~10 minutes)
+        local RUN_STATUS=""
+        for attempt in $(seq 1 40); do
+          sleep 15
+          local RUN_JSON
+          RUN_JSON=$(gh_workflow_api GET \
+            "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}" \
+            2>/dev/null || echo '{}')
+          RUN_STATUS=$(echo "${RUN_JSON}" | jq -r '.status // "unknown"')
+          local RUN_CONCLUSION
+          RUN_CONCLUSION=$(echo "${RUN_JSON}" | jq -r '.conclusion // ""')
+          if [ "${RUN_STATUS}" = "completed" ]; then
+            if [ "${RUN_CONCLUSION}" != "success" ]; then
+              echo "Workflow run ${RUN_ID} completed with conclusion: ${RUN_CONCLUSION}" >&2
+              return 1
+            fi
+            break
+          fi
+        done
+
+        if [ "${RUN_STATUS}" != "completed" ]; then
+          echo "Workflow run ${RUN_ID} timed out" >&2
+          return 1
+        fi
+
+        # Extract output from job logs
+        local JOBS
+        JOBS=$(gh_workflow_api GET \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}/jobs" \
+          2>/dev/null || echo '{"jobs":[]}')
+
+        local ALL_JOB_IDS
+        ALL_JOB_IDS=$(echo "${JOBS}" | jq -r '.jobs[].id')
+
+        for JOB_ID in ${ALL_JOB_IDS}; do
+          local JOB_LOGS
+          JOB_LOGS=$(gh_workflow_api GET \
+            "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${JOB_ID}/logs" \
+            2>/dev/null || true)
+          local VALUE
+          VALUE=$(echo "${JOB_LOGS}" | grep -v '\[36;1m' | grep -oP "(?<=${output_name}=)[^\s]+" | head -1 || true)
+          if [ -n "${VALUE}" ]; then
+            echo "${VALUE}"
+            return 0
+          fi
+        done
+
+        echo "Output '${output_name}' not found in workflow logs" >&2
+        return 1
+      }
+
+      is_terminal_status() {
+        local s
+        s=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+        [[ "$s" == "success" || "$s" == "failure" || "$s" == "failed" || "$s" == "aborted" || "$s" == "unstable" || "$s" == "not_built" ]]
       }
 
       echo "Scanning comments on PR #${PR_NUMBER} in ${OWNER}/${REPO}"
@@ -146,9 +280,60 @@ spec:
         PAGE=$((PAGE + 1))
       done
 
-      echo "resume-from: ${RESUME_FROM}"
-      echo "queue-url: ${FOUND_QUEUE_URL}"
-      echo "job-url: ${FOUND_JOB_URL}"
+      # ---------------------------------------------------------------
+      # Verify Jenkins job status before deciding to resume
+      # ---------------------------------------------------------------
+      if [ -n "${FOUND_QUEUE_URL}" ]; then
+        echo ""
+        echo "Verifying Jenkins job status for queue URL: ${FOUND_QUEUE_URL}"
+        echo "Dispatching monitor workflow to resolve queue and check status..."
+
+        JOB_URL_RESULT=$(dispatch_and_get_output "queue-url" "${JENKINS_BASE_URL}${FOUND_QUEUE_URL}" "jenkins-job-url" 2>/dev/null) || true
+
+        if [ -n "${JOB_URL_RESULT}" ]; then
+          JOB_URL_REL="${JOB_URL_RESULT#${JENKINS_BASE_URL}}"
+          [[ "${JOB_URL_REL}" == /* ]] || JOB_URL_REL="/${JOB_URL_REL}"
+          echo "Resolved job URL: ${JOB_URL_REL}"
+
+          echo "Checking job status..."
+          STATUS_RESULT=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${JOB_URL_REL}" "jenkins-job-status" 2>/dev/null) || true
+
+          if [ -n "${STATUS_RESULT}" ] && is_terminal_status "${STATUS_RESULT}"; then
+            echo "Jenkins job already completed (status=${STATUS_RESULT}). Will trigger a fresh job."
+            RESUME_FROM="none"
+            FOUND_QUEUE_URL=""
+          else
+            echo "Jenkins job still running (status=${STATUS_RESULT:-unknown}). Resuming from job-url."
+            RESUME_FROM="job-url"
+            FOUND_JOB_URL="${JOB_URL_REL}"
+            FOUND_QUEUE_URL=""
+          fi
+        else
+          echo "Could not resolve job URL from queue. Keeping resume-from=${RESUME_FROM} as fallback."
+        fi
+      fi
+
+      if [ -n "${FOUND_JOB_URL}" ] && [ "${RESUME_FROM}" = "job-url" ]; then
+        echo ""
+        echo "Verifying Jenkins job status for job URL: ${FOUND_JOB_URL}"
+        echo "Dispatching monitor workflow to check status..."
+
+        STATUS_RESULT=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${FOUND_JOB_URL}" "jenkins-job-status" 2>/dev/null) || true
+
+        if [ -n "${STATUS_RESULT}" ] && is_terminal_status "${STATUS_RESULT}"; then
+          echo "Jenkins job already completed (status=${STATUS_RESULT}). Will trigger a fresh job."
+          RESUME_FROM="none"
+          FOUND_JOB_URL=""
+        else
+          echo "Jenkins job still running (status=${STATUS_RESULT:-unknown}). Resuming from job-url."
+        fi
+      fi
+
+      echo ""
+      echo "Final decision:"
+      echo "  resume-from: ${RESUME_FROM}"
+      echo "  queue-url: ${FOUND_QUEUE_URL}"
+      echo "  job-url: ${FOUND_JOB_URL}"
 
       printf '%s' "${RESUME_FROM}" > "$(results.resume-from.path)"
       printf '%s' "${FOUND_QUEUE_URL}" > "$(results.queue-url.path)"

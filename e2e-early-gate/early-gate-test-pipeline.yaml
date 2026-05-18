@@ -81,6 +81,12 @@ spec:
     description: Key in the secret that holds the Jenkins base URL (e.g. https://host)
     default: jenkins-url
 
+  # --- Comment behavior ---
+  - name: delete-intermediate-comments
+    type: string
+    description: "Delete intermediate PR comments (queue-url, job-url) once superseded. When true, comments include a note that they will be replaced."
+    default: "false"
+
   # ==========================================================================
   # TASKS
   # ==========================================================================
@@ -116,6 +122,10 @@ spec:
       - name: pathInRepo
         value: e2e-early-gate/tasks/check-ongoing-jobs.yaml
     params:
+    - name: github-workflow-repo
+      value: $(params.github-workflow-repo)
+    - name: monitor-workflow-file
+      value: $(params.monitor-workflow-file)
     - name: workflow-token-secret-name
       value: $(params.workflow-token-secret-name)
     - name: workflow-token-secret-key
@@ -124,6 +134,10 @@ spec:
       value: $(params.pr-token-secret-name)
     - name: pr-token-secret-key
       value: $(params.pr-token-secret-key)
+    - name: jenkins-url-secret-name
+      value: $(params.jenkins-url-secret-name)
+    - name: jenkins-url-secret-key
+      value: $(params.jenkins-url-secret-key)
 
   # --------------------------------------------------------------------------
   # 3. Trigger test pipeline — dispatch GitHub workflow, post queue-url-comment
@@ -162,6 +176,8 @@ spec:
       value: $(params.jenkins-url-secret-name)
     - name: jenkins-url-secret-key
       value: $(params.jenkins-url-secret-key)
+    - name: delete-intermediate-comments
+      value: $(params.delete-intermediate-comments)
 
   # --------------------------------------------------------------------------
   # 4. Monitor Jenkins job — resolve job URL, poll to completion, post results
@@ -194,6 +210,8 @@ spec:
       value: $(params.monitor-workflow-file)
     - name: queue-url-poll-interval
       value: $(params.queue-url-poll-interval)
+    - name: delete-intermediate-comments
+      value: $(params.delete-intermediate-comments)
     - name: job-status-poll-interval
       value: $(params.job-status-poll-interval)
     - name: workflow-token-secret-name

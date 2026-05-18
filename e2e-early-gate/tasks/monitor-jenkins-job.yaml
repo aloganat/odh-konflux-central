@@ -420,7 +420,12 @@ spec:
         fi
 
         # Post job-url-comment
-        JOB_COMMENT_BODY=$(printf '<!-- early-gate-job-url job_url=%s -->\n**Early Gate Test - Job Triggered**\n\nThe Jenkins job is now running.\n\n- **Job URL:** %s\n- **FBC Tag:** %s\n\n_This comment will be replaced once the job completes._' \
+        REPLACE_NOTE=""
+        if [ "${DELETE_INTERMEDIATE_COMMENTS}" = "true" ]; then
+          REPLACE_NOTE='\n\n_This comment will be replaced once the job completes._'
+        fi
+
+        JOB_COMMENT_BODY=$(printf '<!-- early-gate-job-url job_url=%s -->\n**Early Gate Test - Job Triggered**\n\nThe Jenkins job is now running.\n\n- **Job URL:** %s\n- **FBC Tag:** %s'"${REPLACE_NOTE}" \
           "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FBC_TAG}")
 
         post_pr_comment "${JOB_COMMENT_BODY}"
@@ -479,8 +484,9 @@ spec:
       echo ""
       echo "=== Phase C: Fetching test summary ==="
 
-      SUMMARY_URL="https://raw.githubusercontent.com/opendatahub-io/odh-build-metadata/early-gate/${REPO_NAME}/${PR_NUMBER}/early-gate-test-summary.yaml"
-      echo "Summary URL: ${SUMMARY_URL}"
+      SUMMARY_RAW_URL="https://raw.githubusercontent.com/opendatahub-io/odh-build-metadata/early-gate/${REPO_NAME}/${PR_NUMBER}/early-gate-test-summary.yaml"
+      SUMMARY_DISPLAY_URL="https://github.com/opendatahub-io/odh-build-metadata/blob/early-gate/${REPO_NAME}/${PR_NUMBER}/early-gate-test-summary.yaml"
+      echo "Summary URL: ${SUMMARY_RAW_URL}"
 
       SUMMARY_VALID=false
       SUMMARY=""
@@ -491,7 +497,7 @@ spec:
 
       for attempt in 1 2 3 4 5; do
         echo "Attempt ${attempt}/5: downloading summary..."
-        RAW_SUMMARY=$(curl -sSf "${SUMMARY_URL}" 2>/dev/null || true)
+        RAW_SUMMARY=$(curl -sSf "${SUMMARY_RAW_URL}" 2>/dev/null || true)
 
         if [ -z "${RAW_SUMMARY}" ]; then
           echo "Summary not yet available, waiting 30s..."
@@ -536,12 +542,12 @@ spec:
 
       # Build and post completion comment
       if [ "${SUMMARY_VALID}" = "true" ]; then
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
-          "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" \
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Results** | [early-gate-test-summary.yaml](%s) |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
+          "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${SUMMARY_DISPLAY_URL}" \
           "${PASSED_COUNT}" "${FAILED_COUNT}" "${SKIPPED_COUNT}" "${TOTAL_COUNT}")
       else
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n`%s`' \
-          "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${SUMMARY_URL}")
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n[early-gate-test-summary.yaml](%s)' \
+          "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${SUMMARY_DISPLAY_URL}")
       fi
 
       post_pr_comment "${COMPLETION_BODY}"
