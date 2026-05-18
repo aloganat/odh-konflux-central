@@ -1,4 +1,4 @@
-use kubearchive for getting logs of Konflux pipelinerun or taskrun
+use kubearchive for getting logs of Konflux pipelinerun or taskruns which are completed, not running
 these custom resorces are also denoted with pr or tr respectively
 logs can be obtained using 
 
@@ -7,3 +7,7 @@ oc ka logs tr/<taskrun-name>
 
 taskrun names for a given pipelinerun can be found by scanning the output of command "oc ka get pr <pipelinerun-name> -o yaml"
 taskrun name format would be of <pipelinerun-name>-<task-name>
+
+logs of completed pipelineruns or task runs can be directly found directly using oc
+oc get pr <pipelinerun-name>
+oc logs tr <taskrun-name>

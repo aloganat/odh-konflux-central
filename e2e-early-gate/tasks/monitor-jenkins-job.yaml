@@ -372,12 +372,27 @@ spec:
 
         echo "Using queue URL: ${QUEUE_URL}"
 
-        while true; do
+        for phase_a_attempt in $(seq 1 20); do
           RUN_ID=$(dispatch_monitor_workflow "queue-url" "${JENKINS_BASE_URL}${QUEUE_URL}") || {
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
-            echo "Monitor workflow dispatch/wait failed (failure ${CONSECUTIVE_FAILURES}/10)"
-            if [ "${CONSECUTIVE_FAILURES}" -ge 10 ]; then
-              echo "ERROR: 10 consecutive monitor workflow failures. Exiting."
+            echo "Monitor workflow dispatch/wait failed (failure ${CONSECUTIVE_FAILURES}/5)"
+            if [ "${CONSECUTIVE_FAILURES}" -ge 5 ]; then
+              echo "Queue resolution failed 5 times. Scanning previous workflow runs for an already-resolved job URL..."
+              # Fallback: scan recent monitor workflow runs that may have already resolved the job URL
+              RECENT_RUNS=$(gh_workflow_api GET \
+                "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${MONITOR_WORKFLOW}/runs?per_page=10&status=completed&event=workflow_dispatch" \
+                2>/dev/null || echo '{"workflow_runs":[]}')
+              SUCCESSFUL_RUN_IDS=$(echo "${RECENT_RUNS}" | jq -r '[.workflow_runs[] | select(.conclusion == "success")] | .[0:5] | .[].id')
+              for PREV_RUN_ID in ${SUCCESSFUL_RUN_IDS}; do
+                PREV_URL=$(get_workflow_output "${PREV_RUN_ID}" "jenkins-job-url")
+                if [ -n "${PREV_URL}" ]; then
+                  echo "Found job URL from previous workflow run ${PREV_RUN_ID}: ${PREV_URL}"
+                  JENKINS_JOB_URL="${PREV_URL#${JENKINS_BASE_URL}}"
+                  [[ "${JENKINS_JOB_URL}" == /* ]] || JENKINS_JOB_URL="/${JENKINS_JOB_URL}"
+                  break 2
+                fi
+              done
+              echo "ERROR: Could not resolve Jenkins job URL from queue or previous runs."
               exit 1
             fi
             echo "Retrying in ${QUEUE_URL_POLL_INTERVAL}s..."
@@ -398,6 +413,11 @@ spec:
           echo "Job URL not yet available, retrying in ${QUEUE_URL_POLL_INTERVAL}s..."
           sleep "${QUEUE_URL_POLL_INTERVAL}"
         done
+
+        if [ -z "${JENKINS_JOB_URL}" ]; then
+          echo "ERROR: Could not resolve Jenkins job URL after 20 attempts."
+          exit 1
+        fi
 
         # Post job-url-comment
         JOB_COMMENT_BODY=$(printf '<!-- early-gate-job-url job_url=%s -->\n**Early Gate Test - Job Triggered**\n\nThe Jenkins job is now running.\n\n- **Job URL:** %s\n- **FBC Tag:** %s\n\n_This comment will be replaced once the job completes._' \
