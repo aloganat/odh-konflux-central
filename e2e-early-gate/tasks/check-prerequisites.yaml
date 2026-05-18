@@ -35,21 +35,26 @@ spec:
       echo "Catalog image: ${CATALOG_IMAGE}"
       echo "Bundle image:  ${BUNDLE_IMAGE}"
 
+      check_image() {
+        local image="$1"
+        local label="$2"
+        for attempt in 1 2 3; do
+          if skopeo inspect --no-creds "docker://${image}" &>/dev/null; then
+            echo "✓ ${label} exists: ${image}"
+            return 0
+          fi
+          if [ "${attempt}" -lt 3 ]; then
+            echo "  ${label} check failed (attempt ${attempt}/3), retrying in 15s..."
+            sleep 15
+          fi
+        done
+        echo "✗ ${label} NOT found after 3 attempts: ${image}"
+        return 1
+      }
+
       MISSING=0
-
-      if skopeo inspect --no-creds "docker://${CATALOG_IMAGE}" &>/dev/null; then
-        echo "✓ Catalog image exists: ${CATALOG_IMAGE}"
-      else
-        echo "✗ Catalog image NOT found: ${CATALOG_IMAGE}"
-        MISSING=1
-      fi
-
-      if skopeo inspect --no-creds "docker://${BUNDLE_IMAGE}" &>/dev/null; then
-        echo "✓ Bundle image exists: ${BUNDLE_IMAGE}"
-      else
-        echo "✗ Bundle image NOT found: ${BUNDLE_IMAGE}"
-        MISSING=1
-      fi
+      check_image "${CATALOG_IMAGE}" "Catalog image" || MISSING=1
+      check_image "${BUNDLE_IMAGE}" "Bundle image"   || MISSING=1
 
       if [ "${MISSING}" -eq 1 ]; then
         echo ""

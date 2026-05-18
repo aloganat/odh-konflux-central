@@ -214,11 +214,18 @@ spec:
         # Wait for completion (timeout: 10 minutes)
         for attempt in $(seq 1 40); do
           sleep 15
-          local RUN_STATUS
-          RUN_STATUS=$(gh_workflow_api GET \
+          local RUN_JSON
+          RUN_JSON=$(gh_workflow_api GET \
             "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}" \
-            2>/dev/null | jq -r '.status // "unknown"')
+            2>/dev/null || echo '{}')
+          local RUN_STATUS RUN_CONCLUSION
+          RUN_STATUS=$(echo "${RUN_JSON}" | jq -r '.status // "unknown"')
+          RUN_CONCLUSION=$(echo "${RUN_JSON}" | jq -r '.conclusion // ""')
           if [ "${RUN_STATUS}" = "completed" ]; then
+            if [ "${RUN_CONCLUSION}" != "success" ]; then
+              echo "Monitor workflow run ${RUN_ID} completed with conclusion: ${RUN_CONCLUSION}" >&2
+              return 1
+            fi
             echo "${RUN_ID}"
             return 0
           fi
@@ -230,6 +237,8 @@ spec:
 
       # Reads a named output from workflow run jobs by scanning step logs.
       # Looks for lines of the form: <output_name>=<value>
+      # Filters out ANSI-colored command echo lines (script source previews)
+      # to avoid matching unexpanded shell variables.
       get_workflow_output() {
         local RUN_ID="$1"
         local OUTPUT_NAME="$2"
@@ -248,7 +257,7 @@ spec:
             "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${JOB_ID}/logs" \
             2>/dev/null || true)
           local VALUE
-          VALUE=$(echo "${JOB_LOGS}" | grep -oP "(?<=${OUTPUT_NAME}=)[^\s]+" | head -1 || true)
+          VALUE=$(echo "${JOB_LOGS}" | grep -v '\[36;1m' | grep -oP "(?<=${OUTPUT_NAME}=)[^\s]+" | head -1 || true)
           if [ -n "${VALUE}" ]; then
             echo "${VALUE}"
             return 0
