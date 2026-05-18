@@ -349,7 +349,7 @@ spec:
         if [ -n "${Q}" ] && [ -n "${J}" ]; then
           echo "  Queue-url and job-url found without completion. Verifying job status..."
 
-          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${J}" "jenkins-job-status" 2>/dev/null) || {
+          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${J}" "jenkins-job-status") || {
             echo "  Status check failed. Abandoning this group."
             continue
           }
@@ -371,7 +371,7 @@ spec:
         if [ -n "${Q}" ] && [ -z "${J}" ]; then
           echo "  Queue-url found without job-url. Resolving via monitor workflow..."
 
-          JOB_URL_RESULT=$(dispatch_and_get_output "queue-url" "${JENKINS_BASE_URL}${Q}" "jenkins-job-url" 2>/dev/null) || {
+          JOB_URL_RESULT=$(dispatch_and_get_output "queue-url" "${JENKINS_BASE_URL}${Q}" "jenkins-job-url") || {
             echo "  Queue resolution failed. Abandoning this group."
             continue
           }
@@ -380,7 +380,7 @@ spec:
           [[ "${JOB_URL_REL}" == /* ]] || JOB_URL_REL="/${JOB_URL_REL}"
           echo "  Resolved job URL: ${JOB_URL_REL}. Checking status..."
 
-          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${JOB_URL_REL}" "jenkins-job-status" 2>/dev/null) || {
+          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${JOB_URL_REL}" "jenkins-job-status") || {
             echo "  Status check failed. Abandoning this group."
             continue
           }
@@ -402,7 +402,7 @@ spec:
         if [ -z "${Q}" ] && [ -n "${J}" ]; then
           echo "  Job-url found without queue-url. Verifying job status..."
 
-          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${J}" "jenkins-job-status" 2>/dev/null) || {
+          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${J}" "jenkins-job-status") || {
             echo "  Status check failed. Abandoning this group."
             continue
           }

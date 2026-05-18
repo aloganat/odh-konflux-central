@@ -272,7 +272,7 @@ spec:
           fi
         done
 
-        return 0
+        return 1
       }
 
       # Posts a comment on the current PR.
@@ -464,7 +464,7 @@ spec:
       CONSECUTIVE_FAILURES=0
       FINAL_STATUS=""
 
-      while true; do
+      for phase_b_attempt in $(seq 1 120); do
         RUN_ID=$(dispatch_monitor_workflow "job-url" "${JENKINS_BASE_URL}${JENKINS_JOB_URL}") || {
           CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
           echo "Monitor workflow failure (${CONSECUTIVE_FAILURES}/10)"
@@ -482,7 +482,7 @@ spec:
         echo "Current Jenkins job status: '${STATUS}'"
 
         # Non-terminal statuses — keep polling
-        if [ -z "${STATUS}" ] || [ "${STATUS}" = "running" ] || [ "${STATUS}" = "queued" ] || [ "${STATUS}" = "INPROGRESS" ]; then
+        if [ -z "${STATUS}" ] || [ "${STATUS}" = "running" ] || [ "${STATUS}" = "queued" ] || [ "${STATUS}" = "IN_PROGRESS" ]; then
           echo "Job still in progress, retrying in ${JOB_STATUS_POLL_INTERVAL}s..."
           sleep "${JOB_STATUS_POLL_INTERVAL}"
           continue
@@ -492,6 +492,11 @@ spec:
         echo "Jenkins job completed with status: ${FINAL_STATUS}"
         break
       done
+
+      if [ -z "${FINAL_STATUS}" ]; then
+        echo "ERROR: Jenkins job did not complete within 120 poll iterations."
+        exit 1
+      fi
 
       # ---------------------------------------------------------------
       # Phase C: Fetch test summary and post completion comment
@@ -578,8 +583,10 @@ spec:
       # ---------------------------------------------------------------
       LOWER_STATUS=$(echo "${FINAL_STATUS}" | tr '[:upper:]' '[:lower:]')
 
-      if [ "${LOWER_STATUS}" = "failure" ] || [ "${LOWER_STATUS}" = "failed" ]; then
-        echo "Jenkins job failed. Marking pipeline as failed."
+      if [ "${LOWER_STATUS}" = "failure" ] || [ "${LOWER_STATUS}" = "failed" ] || \
+         [ "${LOWER_STATUS}" = "aborted" ] || [ "${LOWER_STATUS}" = "unstable" ] || \
+         [ "${LOWER_STATUS}" = "not_built" ]; then
+        echo "Jenkins job ended with status '${FINAL_STATUS}'. Marking pipeline as failed."
         exit 1
       fi
 
