@@ -71,6 +71,16 @@ spec:
     description: Key in the secret that holds the GitHub token for PR comment operations
     default: commenter-token
 
+  # --- Jenkins config ---
+  - name: jenkins-url-secret-name
+    type: string
+    description: Name of the Kubernetes secret containing the Jenkins base URL
+    default: rhods-ci
+  - name: jenkins-url-secret-key
+    type: string
+    description: Key in the secret that holds the Jenkins base URL (e.g. https://host)
+    default: jenkins-url
+
   # ==========================================================================
   # TASKS
   # ==========================================================================
@@ -148,6 +158,10 @@ spec:
       value: $(params.pr-token-secret-name)
     - name: pr-token-secret-key
       value: $(params.pr-token-secret-key)
+    - name: jenkins-url-secret-name
+      value: $(params.jenkins-url-secret-name)
+    - name: jenkins-url-secret-key
+      value: $(params.jenkins-url-secret-key)
 
   # --------------------------------------------------------------------------
   # 4. Monitor Jenkins job — resolve job URL, poll to completion, post results
@@ -190,3 +204,7 @@ spec:
       value: $(params.pr-token-secret-name)
     - name: pr-token-secret-key
       value: $(params.pr-token-secret-key)
+    - name: jenkins-url-secret-name
+      value: $(params.jenkins-url-secret-name)
+    - name: jenkins-url-secret-key
+      value: $(params.jenkins-url-secret-key)

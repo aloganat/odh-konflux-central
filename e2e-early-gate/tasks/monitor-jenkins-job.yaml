@@ -13,11 +13,11 @@ spec:
     a final job-completion-comment on the PR.
   params:
   - name: queue-url-from-check
-    description: Jenkins queue URL found by the check-ongoing-jobs task (empty if not resuming from queue)
+    description: Relative Jenkins queue path from check-ongoing-jobs (empty if not resuming from queue)
     type: string
     default: ""
   - name: job-url-from-check
-    description: Jenkins job URL found by the check-ongoing-jobs task (empty if not resuming from job)
+    description: Relative Jenkins job path from check-ongoing-jobs (empty if not resuming from job)
     type: string
     default: ""
   - name: github-workflow-repo
@@ -56,6 +56,14 @@ spec:
     description: Key in the secret that holds the GitHub token for PR comment operations
     type: string
     default: commenter-token
+  - name: jenkins-url-secret-name
+    description: Name of the Kubernetes secret containing the Jenkins base URL
+    type: string
+    default: rhods-ci
+  - name: jenkins-url-secret-key
+    description: Key in the secret that holds the Jenkins base URL (e.g. https://host)
+    type: string
+    default: jenkins-url
   steps:
   - name: install-yq
     image: quay.io/konflux-ci/konflux-test:stable
@@ -106,6 +114,11 @@ spec:
       value: $(params.queue-url-poll-interval)
     - name: JOB_STATUS_POLL_INTERVAL
       value: $(params.job-status-poll-interval)
+    - name: JENKINS_BASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: $(params.jenkins-url-secret-name)
+          key: $(params.jenkins-url-secret-key)
     script: |
       #!/bin/bash
       set -euo pipefail
@@ -118,8 +131,18 @@ spec:
 
       FBC_TAG="odh-pr-${PR_NUMBER}-${REPO_NAME}"
 
+      JENKINS_BASE_URL="${JENKINS_BASE_URL%/}"
+
       JOB_URL="${JOB_URL_FROM_CHECK}"
       QUEUE_URL="${QUEUE_URL_FROM_CHECK}"
+
+      # Normalize: strip base URL if inputs are full URLs (backward compat with old PR comments)
+      if [[ "${QUEUE_URL}" == ${JENKINS_BASE_URL}* ]]; then
+        QUEUE_URL="${QUEUE_URL#${JENKINS_BASE_URL}}"
+      fi
+      if [[ "${JOB_URL}" == ${JENKINS_BASE_URL}* ]]; then
+        JOB_URL="${JOB_URL#${JENKINS_BASE_URL}}"
+      fi
 
       echo "monitor-jenkins-job starting"
       echo "  QUEUE_URL_FROM_CHECK: ${QUEUE_URL_FROM_CHECK}"
@@ -341,7 +364,7 @@ spec:
         echo "Using queue URL: ${QUEUE_URL}"
 
         while true; do
-          RUN_ID=$(dispatch_monitor_workflow "queue-url" "${QUEUE_URL}") || {
+          RUN_ID=$(dispatch_monitor_workflow "queue-url" "${JENKINS_BASE_URL}${QUEUE_URL}") || {
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
             echo "Monitor workflow dispatch/wait failed (failure ${CONSECUTIVE_FAILURES}/10)"
             if [ "${CONSECUTIVE_FAILURES}" -ge 10 ]; then
@@ -354,10 +377,12 @@ spec:
           }
 
           CONSECUTIVE_FAILURES=0
-          JENKINS_JOB_URL=$(get_workflow_output "${RUN_ID}" "jenkins-job-url")
+          JENKINS_JOB_URL_FULL=$(get_workflow_output "${RUN_ID}" "jenkins-job-url")
 
-          if [ -n "${JENKINS_JOB_URL}" ]; then
-            echo "Jenkins job URL resolved: ${JENKINS_JOB_URL}"
+          if [ -n "${JENKINS_JOB_URL_FULL}" ]; then
+            JENKINS_JOB_URL="${JENKINS_JOB_URL_FULL#${JENKINS_BASE_URL}}"
+            [[ "${JENKINS_JOB_URL}" == /* ]] || JENKINS_JOB_URL="/${JENKINS_JOB_URL}"
+            echo "Jenkins job URL resolved (relative): ${JENKINS_JOB_URL}"
             break
           fi
 
@@ -391,7 +416,7 @@ spec:
       FINAL_STATUS=""
 
       while true; do
-        RUN_ID=$(dispatch_monitor_workflow "job-url" "${JENKINS_JOB_URL}") || {
+        RUN_ID=$(dispatch_monitor_workflow "job-url" "${JENKINS_BASE_URL}${JENKINS_JOB_URL}") || {
           CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
           echo "Monitor workflow failure (${CONSECUTIVE_FAILURES}/10)"
           if [ "${CONSECUTIVE_FAILURES}" -ge 10 ]; then
@@ -449,8 +474,11 @@ spec:
         FBC_TAG_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.fbc_tag // ""')
         CORR_ID_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.correlation_id // ""')
 
-        # Validate: jenkins job URL contains the relative path from summary
-        if [[ "${JENKINS_JOB_URL}" != *"${JOB_URL_IN_SUMMARY}"* ]]; then
+        # Strip base URL from summary if present (backward compat with full URLs)
+        JOB_URL_IN_SUMMARY_REL="${JOB_URL_IN_SUMMARY#${JENKINS_BASE_URL}}"
+        [[ "${JOB_URL_IN_SUMMARY_REL}" == /* ]] || JOB_URL_IN_SUMMARY_REL="/${JOB_URL_IN_SUMMARY_REL}"
+
+        if [ "${JENKINS_JOB_URL}" != "${JOB_URL_IN_SUMMARY_REL}" ]; then
           echo "WARNING: job_url mismatch: summary='${JOB_URL_IN_SUMMARY}' vs job='${JENKINS_JOB_URL}'"
           echo "Retrying in 30s (may be a stale result from a previous run)..."
           sleep 30

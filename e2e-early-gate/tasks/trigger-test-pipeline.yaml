@@ -35,9 +35,17 @@ spec:
     description: Key in the secret that holds the GitHub token for PR comment operations
     type: string
     default: commenter-token
+  - name: jenkins-url-secret-name
+    description: Name of the Kubernetes secret containing the Jenkins base URL
+    type: string
+    default: rhods-ci
+  - name: jenkins-url-secret-key
+    description: Key in the secret that holds the Jenkins base URL (e.g. https://host)
+    type: string
+    default: jenkins-url
   results:
   - name: queue-url
-    description: Jenkins queue URL for the triggered job
+    description: Relative Jenkins queue path for the triggered job (e.g. /queue/item/12345)
   - name: correlation-id
     description: Correlation ID used for this trigger invocation
   steps:
@@ -66,6 +74,11 @@ spec:
         secretKeyRef:
           name: $(params.pr-token-secret-name)
           key: $(params.pr-token-secret-key)
+    - name: JENKINS_BASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: $(params.jenkins-url-secret-name)
+          key: $(params.jenkins-url-secret-key)
     - name: WORKFLOW_REPO
       value: $(params.github-workflow-repo)
     - name: TRIGGER_WORKFLOW
@@ -74,7 +87,9 @@ spec:
       #!/bin/bash
       set -euo pipefail
 
-      JENKINS_HOST="jenkins-csb-rhods-opendatascience.dno.corp.redhat.com"
+      JENKINS_BASE_URL="${JENKINS_BASE_URL%/}"
+      JENKINS_HOST="${JENKINS_BASE_URL#https://}"
+      JENKINS_HOST="${JENKINS_HOST#http://}"
 
       OWNER="${REPO_ORG}"
       REPO="${REPO_URL}"
@@ -197,13 +212,13 @@ spec:
         2>/dev/null || echo '{"jobs":[]}')
 
       QUEUE_JOB_ID=$(echo "${JOBS}" | jq -r \
-        '[.jobs[] | select(.name | test("queue.url|queue_url"; "i"))] | first | .id // empty')
+        '[.jobs[] | select(.name | test("queue.url|queue_url|trigger.jenkins"; "i"))] | first | .id // empty')
 
       if [ -n "${QUEUE_JOB_ID}" ]; then
         JOB_LOGS=$(gh_workflow_api GET \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${QUEUE_JOB_ID}/logs" \
           2>/dev/null || true)
-        QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+" | head -1 || true)
+        QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+/?" | sed 's|/$||' | head -1 || true)
       fi
 
       # Fallback: scan all step logs for queue URL pattern
@@ -214,7 +229,7 @@ spec:
           JOB_LOGS=$(gh_workflow_api GET \
             "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${JOB_ID}/logs" \
             2>/dev/null || true)
-          QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+" | head -1 || true)
+          QUEUE_URL=$(echo "${JOB_LOGS}" | grep -oP "https://${JENKINS_HOST}/queue/item/[0-9]+/?" | sed 's|/$||' | head -1 || true)
           if [ -n "${QUEUE_URL}" ]; then
             echo "Found queue URL in job ${JOB_ID} logs: ${QUEUE_URL}"
             break
@@ -228,13 +243,18 @@ spec:
         exit 1
       fi
 
-      echo "Jenkins queue URL: ${QUEUE_URL}"
+      echo "Jenkins queue URL (full): ${QUEUE_URL}"
+
+      # Strip base URL to get relative path
+      QUEUE_URL_RELATIVE="${QUEUE_URL#${JENKINS_BASE_URL}}"
+      [[ "${QUEUE_URL_RELATIVE}" == /* ]] || QUEUE_URL_RELATIVE="/${QUEUE_URL_RELATIVE}"
+      echo "Jenkins queue URL (relative): ${QUEUE_URL_RELATIVE}"
 
       # ---------------------------------------------------------------
-      # 5. Post queue-url-comment on the PR
+      # 5. Post queue-url-comment on the PR (relative path only)
       # ---------------------------------------------------------------
       COMMENT_BODY=$(printf '<!-- early-gate-queue-url queue_url=%s -->\n**Early Gate Test - Job Queued**\n\nJenkins job has been queued and will start shortly.\n\n- **Queue URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s\n\n_This comment will be replaced once the job starts._' \
-        "${QUEUE_URL}" "${QUEUE_URL}" "${FBC_TAG}" "${CORRELATION_ID}")
+        "${QUEUE_URL_RELATIVE}" "${QUEUE_URL_RELATIVE}" "${FBC_TAG}" "${CORRELATION_ID}")
 
       gh_pr_api POST \
         "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" \
@@ -243,7 +263,7 @@ spec:
       echo "Posted queue-url-comment on PR #${PR_NUMBER}"
 
       # ---------------------------------------------------------------
-      # 6. Write results
+      # 6. Write results (relative path only)
       # ---------------------------------------------------------------
-      printf '%s' "${QUEUE_URL}" > "$(results.queue-url.path)"
+      printf '%s' "${QUEUE_URL_RELATIVE}" > "$(results.queue-url.path)"
       printf '%s' "${CORRELATION_ID}" > "$(results.correlation-id.path)"

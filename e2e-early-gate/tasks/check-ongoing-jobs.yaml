@@ -31,9 +31,9 @@ spec:
   - name: resume-from
     description: "One of: none, queue-url, job-url"
   - name: queue-url
-    description: Jenkins queue URL extracted from a previous queue-url-comment (empty if not found)
+    description: Relative Jenkins queue path from a previous queue-url-comment (empty if not found)
   - name: job-url
-    description: Jenkins job URL extracted from a previous job-url-comment (empty if not found)
+    description: Relative Jenkins job path from a previous job-url-comment (empty if not found)
   steps:
   - name: scan-pr-comments
     image: quay.io/konflux-ci/konflux-test:stable
