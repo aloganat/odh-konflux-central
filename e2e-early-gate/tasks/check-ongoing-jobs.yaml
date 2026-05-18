@@ -7,13 +7,16 @@ metadata:
     app.kubernetes.io/version: "0.1"
 spec:
   description: |
-    Scans PR comments in descending order to detect a previously triggered but
-    incomplete early-gate Jenkins job, enabling idempotent pipeline execution.
-    When an unresolved queue-url or job-url is found, dispatches the Monitor
-    Jenkins Job workflow to verify the job is still running before deciding to
-    resume. If the job has already completed, returns resume-from=none so a
-    fresh job is triggered.
-    Emits resume-from, queue-url, and job-url results for downstream tasks.
+    Scans PR comments to detect a previously triggered but incomplete early-gate
+    Jenkins job. Groups comments by correlation-id (queue-url, job-url, complete)
+    and processes groups in descending order of creation time.
+
+    For each incomplete group, dispatches the Monitor Jenkins Job workflow to
+    verify the Jenkins job is still running before deciding to resume. Only
+    resumes if the job is confirmed in-progress; abandons the group on any
+    error or if the job has already completed.
+
+    Emits resume-from, queue-url, job-url, and correlation-id results.
   params:
   - name: github-workflow-repo
     description: Owner/repo of the GitHub repo containing the monitor workflow
@@ -49,11 +52,13 @@ spec:
     default: jenkins-url
   results:
   - name: resume-from
-    description: "One of: none, queue-url, job-url"
+    description: "One of: none, job-url"
   - name: queue-url
-    description: Relative Jenkins queue path from a previous queue-url-comment (empty if not found or job already completed)
+    description: Relative Jenkins queue path from the resumed correlation group (empty if starting fresh)
   - name: job-url
-    description: Relative Jenkins job path from a previous job-url-comment (empty if not found or job already completed)
+    description: Relative Jenkins job path from the resumed correlation group (empty if starting fresh)
+  - name: correlation-id
+    description: Correlation ID of the group being resumed (empty if starting fresh)
   steps:
   - name: scan-pr-comments
     image: quay.io/konflux-ci/konflux-test:stable
@@ -97,6 +102,10 @@ spec:
       REPO="${REPO_URL}"
       JENKINS_BASE_URL="${JENKINS_BASE_URL%/}"
 
+      # ---------------------------------------------------------------
+      # Helper functions
+      # ---------------------------------------------------------------
+
       gh_pr_api() {
         local method="$1"
         local url="$2"
@@ -137,7 +146,6 @@ spec:
           -d "{\"ref\":\"main\",\"inputs\":{\"${input_key}\":\"${input_value}\"}}" \
           2>/dev/null || return 1
 
-        # Find the triggered run (poll up to ~3 minutes)
         local RUN_ID=""
         for attempt in $(seq 1 20); do
           sleep 10
@@ -156,7 +164,6 @@ spec:
           return 1
         fi
 
-        # Wait for completion (poll up to ~10 minutes)
         local RUN_STATUS=""
         for attempt in $(seq 1 40); do
           sleep 15
@@ -181,7 +188,6 @@ spec:
           return 1
         fi
 
-        # Extract output from job logs
         local JOBS
         JOBS=$(gh_workflow_api GET \
           "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${RUN_ID}/jobs" \
@@ -213,23 +219,36 @@ spec:
         [[ "$s" == "success" || "$s" == "failure" || "$s" == "failed" || "$s" == "aborted" || "$s" == "unstable" || "$s" == "not_built" ]]
       }
 
+      # Extracts correlation_id from a comment body.
+      # Tries HTML marker first, then falls back to body text for backward compat.
+      extract_correlation_id() {
+        local body="$1"
+        local corr_id
+        corr_id=$(echo "$body" | grep -oP '(?<=correlation_id=)[^ >]+' | head -1 || true)
+        if [ -z "$corr_id" ]; then
+          corr_id=$(echo "$body" | grep -oP '(?<=\*\*Correlation ID:\*\* )\S+' | head -1 || true)
+        fi
+        echo "$corr_id"
+      }
+
+      # ---------------------------------------------------------------
+      # 1. Scan all PR comments and group by correlation-id
+      # ---------------------------------------------------------------
+
       echo "Scanning comments on PR #${PR_NUMBER} in ${OWNER}/${REPO}"
 
-      # Get the current authenticated user login (identifies comments made by this token)
       CURRENT_USER=$(gh_pr_api GET "https://api.github.com/user" | jq -r '.login')
       echo "Authenticated as: ${CURRENT_USER}"
 
-      # Default outputs
-      RESUME_FROM="none"
-      FOUND_QUEUE_URL=""
-      FOUND_JOB_URL=""
+      declare -A CORR_QUEUE_URL
+      declare -A CORR_JOB_URL
+      declare -A CORR_COMPLETE
+      declare -A CORR_LATEST_TIME
 
       PAGE=1
-      DONE=false
-
-      while [ "${DONE}" = "false" ]; do
+      while true; do
         RESPONSE=$(gh_pr_api GET \
-          "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}&sort=created&direction=desc")
+          "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}")
 
         COUNT=$(echo "${RESPONSE}" | jq 'length')
         if [ "${COUNT}" -eq 0 ]; then
@@ -238,103 +257,177 @@ spec:
 
         while IFS= read -r COMMENT_JSON; do
           USER=$(echo "${COMMENT_JSON}" | jq -r '.user.login')
-          BODY=$(echo "${COMMENT_JSON}" | jq -r '.body')
-          COMMENT_ID=$(echo "${COMMENT_JSON}" | jq -r '.id')
-
-          # Only process comments made by the current authenticated user
           if [ "${USER}" != "${CURRENT_USER}" ]; then
             continue
           fi
 
-          # Check for job-completion marker first — if found, stop (job is done, fresh start)
-          if echo "${BODY}" | grep -q "^<!-- early-gate-job-complete "; then
-            echo "Found job-completion-comment (id=${COMMENT_ID}), job previously completed — starting fresh."
-            DONE=true
-            break
-          fi
+          BODY=$(echo "${COMMENT_JSON}" | jq -r '.body')
+          CREATED_AT=$(echo "${COMMENT_JSON}" | jq -r '.created_at')
+          CORR_ID=""
 
-          # Check for job-url marker — job was triggered but pipeline died before completion
-          if echo "${BODY}" | grep -q "^<!-- early-gate-job-url "; then
-            FOUND_JOB_URL=$(echo "${BODY}" | grep -oP '(?<=job_url=)[^ >]+' | head -1)
-            echo "Found job-url-comment (id=${COMMENT_ID}): ${FOUND_JOB_URL}"
-            RESUME_FROM="job-url"
-            DONE=true
-            break
-          fi
-
-          # Check for queue-url marker — job was queued but pipeline died before job started
           if echo "${BODY}" | grep -q "^<!-- early-gate-queue-url "; then
-            FOUND_QUEUE_URL=$(echo "${BODY}" | grep -oP '(?<=queue_url=)[^ >]+' | head -1)
-            echo "Found queue-url-comment (id=${COMMENT_ID}): ${FOUND_QUEUE_URL}"
-            RESUME_FROM="queue-url"
-            DONE=true
-            break
+            CORR_ID=$(extract_correlation_id "${BODY}")
+            Q_URL=$(echo "${BODY}" | grep -oP '(?<=queue_url=)[^ >]+' | head -1 || true)
+            if [ -n "${CORR_ID}" ] && [ -n "${Q_URL}" ]; then
+              CORR_QUEUE_URL["${CORR_ID}"]="${Q_URL}"
+            fi
+          elif echo "${BODY}" | grep -q "^<!-- early-gate-job-url "; then
+            CORR_ID=$(extract_correlation_id "${BODY}")
+            J_URL=$(echo "${BODY}" | grep -oP '(?<=job_url=)[^ >]+' | head -1 || true)
+            if [ -n "${CORR_ID}" ] && [ -n "${J_URL}" ]; then
+              CORR_JOB_URL["${CORR_ID}"]="${J_URL}"
+            fi
+          elif echo "${BODY}" | grep -q "^<!-- early-gate-job-complete "; then
+            CORR_ID=$(extract_correlation_id "${BODY}")
+            if [ -n "${CORR_ID}" ]; then
+              CORR_COMPLETE["${CORR_ID}"]="true"
+            fi
+          fi
+
+          # Track the most recent comment time per correlation-id
+          if [ -n "${CORR_ID}" ]; then
+            if [ -z "${CORR_LATEST_TIME[${CORR_ID}]:-}" ] || [[ "${CREATED_AT}" > "${CORR_LATEST_TIME[${CORR_ID}]}" ]]; then
+              CORR_LATEST_TIME["${CORR_ID}"]="${CREATED_AT}"
+            fi
           fi
 
         done < <(echo "${RESPONSE}" | jq -c '.[]')
 
-        if [ "${DONE}" = "true" ]; then
+        PAGE=$((PAGE + 1))
+        # Safety limit: scan up to 500 comments
+        if [ "${PAGE}" -gt 5 ]; then
           break
         fi
-
-        PAGE=$((PAGE + 1))
       done
 
       # ---------------------------------------------------------------
-      # Verify Jenkins job status before deciding to resume
+      # 2. Sort correlation-ids by most recent comment time (descending)
       # ---------------------------------------------------------------
-      if [ -n "${FOUND_QUEUE_URL}" ]; then
+
+      SORTED_CORR_IDS=()
+      while IFS= read -r line; do
+        [ -n "${line}" ] && SORTED_CORR_IDS+=("${line#* }")
+      done < <(for cid in "${!CORR_LATEST_TIME[@]}"; do
+        echo "${CORR_LATEST_TIME[${cid}]} ${cid}"
+      done | sort -r)
+
+      echo "Found ${#SORTED_CORR_IDS[@]} correlation group(s)"
+
+      # ---------------------------------------------------------------
+      # 3. Process groups in descending order, find first resumable one
+      # ---------------------------------------------------------------
+
+      RESUME_FROM="none"
+      FOUND_QUEUE_URL=""
+      FOUND_JOB_URL=""
+      FOUND_CORR_ID=""
+
+      for CID in "${SORTED_CORR_IDS[@]}"; do
+        Q="${CORR_QUEUE_URL[${CID}]:-}"
+        J="${CORR_JOB_URL[${CID}]:-}"
+        C="${CORR_COMPLETE[${CID}]:-}"
+
         echo ""
-        echo "Verifying Jenkins job status for queue URL: ${FOUND_QUEUE_URL}"
-        echo "Dispatching monitor workflow to resolve queue and check status..."
+        echo "Checking correlation group: ${CID}"
+        echo "  queue-url: ${Q:-<none>}"
+        echo "  job-url: ${J:-<none>}"
+        echo "  complete: ${C:-<none>}"
 
-        JOB_URL_RESULT=$(dispatch_and_get_output "queue-url" "${JENKINS_BASE_URL}${FOUND_QUEUE_URL}" "jenkins-job-url" 2>/dev/null) || true
+        # Skip if no actionable markers (e.g. orphaned complete comment)
+        if [ -z "${Q}" ] && [ -z "${J}" ]; then
+          echo "  No queue-url or job-url. Skipping."
+          continue
+        fi
 
-        if [ -n "${JOB_URL_RESULT}" ]; then
+        # All 3 found (or complete exists) -> job previously completed, skip
+        if [ -n "${C}" ]; then
+          echo "  Completion comment found. Job previously completed. Skipping."
+          continue
+        fi
+
+        # Queue-url + job-url found, no complete -> verify job status
+        if [ -n "${Q}" ] && [ -n "${J}" ]; then
+          echo "  Queue-url and job-url found without completion. Verifying job status..."
+
+          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${J}" "jenkins-job-status" 2>/dev/null) || {
+            echo "  Status check failed. Abandoning this group."
+            continue
+          }
+
+          if is_terminal_status "${STATUS}"; then
+            echo "  Job already completed (status=${STATUS}). Abandoning."
+            continue
+          fi
+
+          echo "  Job still in-progress (status=${STATUS}). Resuming."
+          RESUME_FROM="job-url"
+          FOUND_JOB_URL="${J}"
+          FOUND_QUEUE_URL="${Q}"
+          FOUND_CORR_ID="${CID}"
+          break
+        fi
+
+        # Queue-url only, no job-url, no complete -> resolve queue and verify
+        if [ -n "${Q}" ] && [ -z "${J}" ]; then
+          echo "  Queue-url found without job-url. Resolving via monitor workflow..."
+
+          JOB_URL_RESULT=$(dispatch_and_get_output "queue-url" "${JENKINS_BASE_URL}${Q}" "jenkins-job-url" 2>/dev/null) || {
+            echo "  Queue resolution failed. Abandoning this group."
+            continue
+          }
+
           JOB_URL_REL="${JOB_URL_RESULT#${JENKINS_BASE_URL}}"
           [[ "${JOB_URL_REL}" == /* ]] || JOB_URL_REL="/${JOB_URL_REL}"
-          echo "Resolved job URL: ${JOB_URL_REL}"
+          echo "  Resolved job URL: ${JOB_URL_REL}. Checking status..."
 
-          echo "Checking job status..."
-          STATUS_RESULT=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${JOB_URL_REL}" "jenkins-job-status" 2>/dev/null) || true
+          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${JOB_URL_REL}" "jenkins-job-status" 2>/dev/null) || {
+            echo "  Status check failed. Abandoning this group."
+            continue
+          }
 
-          if [ -n "${STATUS_RESULT}" ] && is_terminal_status "${STATUS_RESULT}"; then
-            echo "Jenkins job already completed (status=${STATUS_RESULT}). Will trigger a fresh job."
-            RESUME_FROM="none"
-            FOUND_QUEUE_URL=""
-          else
-            echo "Jenkins job still running (status=${STATUS_RESULT:-unknown}). Resuming from job-url."
-            RESUME_FROM="job-url"
-            FOUND_JOB_URL="${JOB_URL_REL}"
-            FOUND_QUEUE_URL=""
+          if is_terminal_status "${STATUS}"; then
+            echo "  Job already completed (status=${STATUS}). Abandoning."
+            continue
           fi
-        else
-          echo "Could not resolve job URL from queue. Keeping resume-from=${RESUME_FROM} as fallback."
+
+          echo "  Job still in-progress (status=${STATUS}). Resuming."
+          RESUME_FROM="job-url"
+          FOUND_JOB_URL="${JOB_URL_REL}"
+          FOUND_QUEUE_URL="${Q}"
+          FOUND_CORR_ID="${CID}"
+          break
         fi
-      fi
 
-      if [ -n "${FOUND_JOB_URL}" ] && [ "${RESUME_FROM}" = "job-url" ]; then
-        echo ""
-        echo "Verifying Jenkins job status for job URL: ${FOUND_JOB_URL}"
-        echo "Dispatching monitor workflow to check status..."
+        # Job-url only (queue-url comment may have been deleted) -> verify status
+        if [ -z "${Q}" ] && [ -n "${J}" ]; then
+          echo "  Job-url found without queue-url. Verifying job status..."
 
-        STATUS_RESULT=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${FOUND_JOB_URL}" "jenkins-job-status" 2>/dev/null) || true
+          STATUS=$(dispatch_and_get_output "job-url" "${JENKINS_BASE_URL}${J}" "jenkins-job-status" 2>/dev/null) || {
+            echo "  Status check failed. Abandoning this group."
+            continue
+          }
 
-        if [ -n "${STATUS_RESULT}" ] && is_terminal_status "${STATUS_RESULT}"; then
-          echo "Jenkins job already completed (status=${STATUS_RESULT}). Will trigger a fresh job."
-          RESUME_FROM="none"
-          FOUND_JOB_URL=""
-        else
-          echo "Jenkins job still running (status=${STATUS_RESULT:-unknown}). Resuming from job-url."
+          if is_terminal_status "${STATUS}"; then
+            echo "  Job already completed (status=${STATUS}). Abandoning."
+            continue
+          fi
+
+          echo "  Job still in-progress (status=${STATUS}). Resuming."
+          RESUME_FROM="job-url"
+          FOUND_JOB_URL="${J}"
+          FOUND_CORR_ID="${CID}"
+          break
         fi
-      fi
+      done
 
       echo ""
       echo "Final decision:"
       echo "  resume-from: ${RESUME_FROM}"
       echo "  queue-url: ${FOUND_QUEUE_URL}"
       echo "  job-url: ${FOUND_JOB_URL}"
+      echo "  correlation-id: ${FOUND_CORR_ID}"
 
       printf '%s' "${RESUME_FROM}" > "$(results.resume-from.path)"
       printf '%s' "${FOUND_QUEUE_URL}" > "$(results.queue-url.path)"
       printf '%s' "${FOUND_JOB_URL}" > "$(results.job-url.path)"
+      printf '%s' "${FOUND_CORR_ID}" > "$(results.correlation-id.path)"

@@ -204,6 +204,8 @@ spec:
       value: $(tasks.check-ongoing-jobs.results.queue-url)
     - name: job-url-from-check
       value: $(tasks.check-ongoing-jobs.results.job-url)
+    - name: correlation-id
+      value: $(tasks.check-ongoing-jobs.results.correlation-id)
     - name: github-workflow-repo
       value: $(params.github-workflow-repo)
     - name: monitor-workflow-file

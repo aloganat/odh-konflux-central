@@ -20,6 +20,10 @@ spec:
     description: Relative Jenkins job path from check-ongoing-jobs (empty if not resuming from job)
     type: string
     default: ""
+  - name: correlation-id
+    description: Correlation ID from check-ongoing-jobs (empty for fresh runs; extracted from PR comments instead)
+    type: string
+    default: ""
   - name: github-workflow-repo
     description: Owner/repo of the GitHub repo containing the monitor workflow
     type: string
@@ -108,6 +112,8 @@ spec:
       value: $(params.queue-url-from-check)
     - name: JOB_URL_FROM_CHECK
       value: $(params.job-url-from-check)
+    - name: CORRELATION_ID_FROM_CHECK
+      value: $(params.correlation-id)
     - name: DELETE_INTERMEDIATE_COMMENTS
       value: $(params.delete-intermediate-comments)
     - name: QUEUE_URL_POLL_INTERVAL
@@ -135,6 +141,7 @@ spec:
 
       JOB_URL="${JOB_URL_FROM_CHECK}"
       QUEUE_URL="${QUEUE_URL_FROM_CHECK}"
+      CORRELATION_ID="${CORRELATION_ID_FROM_CHECK}"
 
       # Normalize: strip base URL if inputs are full URLs (backward compat with old PR comments)
       if [[ "${QUEUE_URL}" == ${JENKINS_BASE_URL}* ]]; then
@@ -147,6 +154,7 @@ spec:
       echo "monitor-jenkins-job starting"
       echo "  QUEUE_URL_FROM_CHECK: ${QUEUE_URL_FROM_CHECK}"
       echo "  JOB_URL_FROM_CHECK:   ${JOB_URL_FROM_CHECK}"
+      echo "  CORRELATION_ID:       ${CORRELATION_ID}"
       echo "  FBC_TAG: ${FBC_TAG}"
 
       # ---------------------------------------------------------------
@@ -358,6 +366,12 @@ spec:
               [ "${CUSER}" != "${CURRENT_USER}" ] && continue
               if echo "${CBODY}" | grep -q "^<!-- early-gate-queue-url "; then
                 QUEUE_URL=$(echo "${CBODY}" | grep -oP '(?<=queue_url=)[^ >]+' | head -1 || true)
+                if [ -z "${CORRELATION_ID}" ]; then
+                  CORRELATION_ID=$(echo "${CBODY}" | grep -oP '(?<=correlation_id=)[^ >]+' | head -1 || true)
+                  if [ -z "${CORRELATION_ID}" ]; then
+                    CORRELATION_ID=$(echo "${CBODY}" | grep -oP '(?<=\*\*Correlation ID:\*\* )\S+' | head -1 || true)
+                  fi
+                fi
                 [ -n "${QUEUE_URL}" ] && break 2
               fi
             done < <(echo "${PR_COMMENTS}" | jq -c '.[]')
@@ -368,6 +382,7 @@ spec:
             echo "ERROR: No queue URL available from check-ongoing-jobs or PR comments."
             exit 1
           fi
+          echo "Extracted correlation ID: ${CORRELATION_ID}"
         fi
 
         echo "Using queue URL: ${QUEUE_URL}"
@@ -425,8 +440,8 @@ spec:
           REPLACE_NOTE='\n\n_This comment will be replaced once the job completes._'
         fi
 
-        JOB_COMMENT_BODY=$(printf '<!-- early-gate-job-url job_url=%s -->\n**Early Gate Test - Job Triggered**\n\nThe Jenkins job is now running.\n\n- **Job URL:** %s\n- **FBC Tag:** %s'"${REPLACE_NOTE}" \
-          "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FBC_TAG}")
+        JOB_COMMENT_BODY=$(printf '<!-- early-gate-job-url job_url=%s correlation_id=%s -->\n**Early Gate Test - Job Triggered**\n\nThe Jenkins job is now running.\n\n- **Job URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s'"${REPLACE_NOTE}" \
+          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FBC_TAG}" "${CORRELATION_ID}")
 
         post_pr_comment "${JOB_COMMENT_BODY}"
         echo "Posted job-url-comment on PR #${PR_NUMBER}"
@@ -542,12 +557,12 @@ spec:
 
       # Build and post completion comment
       if [ "${SUMMARY_VALID}" = "true" ]; then
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Results** | [early-gate-test-summary.yaml](%s) |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
-          "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${SUMMARY_DISPLAY_URL}" \
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n| **Results** | [early-gate-test-summary.yaml](%s) |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
+          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}" \
           "${PASSED_COUNT}" "${FAILED_COUNT}" "${SKIPPED_COUNT}" "${TOTAL_COUNT}")
       else
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n[early-gate-test-summary.yaml](%s)' \
-          "${JENKINS_JOB_URL}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${SUMMARY_DISPLAY_URL}")
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n[early-gate-test-summary.yaml](%s)' \
+          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}")
       fi
 
       post_pr_comment "${COMPLETION_BODY}"

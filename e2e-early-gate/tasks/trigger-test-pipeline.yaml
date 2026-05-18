@@ -264,8 +264,8 @@ spec:
         REPLACE_NOTE='\n\n_This comment will be replaced once the job starts._'
       fi
 
-      COMMENT_BODY=$(printf '<!-- early-gate-queue-url queue_url=%s -->\n**Early Gate Test - Job Queued**\n\nJenkins job has been queued and will start shortly.\n\n- **Queue URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s'"${REPLACE_NOTE}" \
-        "${QUEUE_URL_RELATIVE}" "${QUEUE_URL_RELATIVE}" "${FBC_TAG}" "${CORRELATION_ID}")
+      COMMENT_BODY=$(printf '<!-- early-gate-queue-url queue_url=%s correlation_id=%s -->\n**Early Gate Test - Job Queued**\n\nJenkins job has been queued and will start shortly.\n\n- **Queue URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s'"${REPLACE_NOTE}" \
+        "${QUEUE_URL_RELATIVE}" "${CORRELATION_ID}" "${QUEUE_URL_RELATIVE}" "${FBC_TAG}" "${CORRELATION_ID}")
 
       gh_pr_api POST \
         "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" \
