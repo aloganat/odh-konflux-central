@@ -110,7 +110,7 @@ spec:
         local method="$1"
         local url="$2"
         shift 2
-        curl -sSf \
+        curl -sSfL \
           -X "${method}" \
           -H "Authorization: Bearer ${WORKFLOW_GITHUB_TOKEN}" \
           -H "Accept: application/vnd.github+json" \
