@@ -474,8 +474,6 @@ spec:
       value: ""
     - name: SOURCE_URL
       value: $(tasks.clone-operator-repo.results.url)
-    - name: BUILDAH_FORMAT
-      value: docker
     - name: SOURCE_ARTIFACT
       value: $(tasks.prefetch-manifests.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
@@ -844,8 +842,6 @@ spec:
       value: $(params.bundle-build-args-file)
     - name: SOURCE_URL
       value: $(tasks.clone-build-config-repo.results.url)
-    - name: BUILDAH_FORMAT
-      value: docker
     - name: SOURCE_ARTIFACT
       value: $(tasks.prefetch-dependencies-bundle.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
@@ -982,8 +978,6 @@ spec:
       value: $(params.catalog-build-args-file)
     - name: SOURCE_URL
       value: $(tasks.clone-build-config-repo.results.url)
-    - name: BUILDAH_FORMAT
-      value: docker
     - name: SOURCE_ARTIFACT
       value: $(tasks.prefetch-dependencies-fbc.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
