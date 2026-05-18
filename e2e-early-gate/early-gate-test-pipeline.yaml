@@ -180,12 +180,15 @@ spec:
       value: $(params.delete-intermediate-comments)
 
   # --------------------------------------------------------------------------
-  # 4. Monitor Jenkins job — resolve job URL, poll to completion, post results
-  #    Always runs (after check-ongoing-jobs so it isn't skipped when trigger is skipped)
+  # 4a. Monitor (fresh) — runs after trigger-test-pipeline for new jobs
+  #     Receives queue-url and correlation-id from trigger-test-pipeline results
   # --------------------------------------------------------------------------
-  - name: monitor-jenkins-job
+  - name: monitor-fresh
+    when:
+    - input: "$(tasks.check-ongoing-jobs.results.resume-from)"
+      operator: in
+      values: ["none"]
     runAfter:
-    - check-ongoing-jobs
     - trigger-test-pipeline
     taskRef:
       resolver: git
@@ -197,12 +200,57 @@ spec:
       - name: pathInRepo
         value: e2e-early-gate/tasks/monitor-jenkins-job.yaml
     params:
-    # queue/job URL from check-ongoing-jobs (non-empty only when resuming a previous run).
-    # For fresh runs the monitor task scans PR comments for the queue-url-comment posted
-    # by trigger-test-pipeline, avoiding any reference to potentially-skipped task results.
-    - name: queue-url-from-check
+    - name: queue-url
+      value: $(tasks.trigger-test-pipeline.results.queue-url)
+    - name: correlation-id
+      value: $(tasks.trigger-test-pipeline.results.correlation-id)
+    - name: github-workflow-repo
+      value: $(params.github-workflow-repo)
+    - name: monitor-workflow-file
+      value: $(params.monitor-workflow-file)
+    - name: queue-url-poll-interval
+      value: $(params.queue-url-poll-interval)
+    - name: delete-intermediate-comments
+      value: $(params.delete-intermediate-comments)
+    - name: job-status-poll-interval
+      value: $(params.job-status-poll-interval)
+    - name: workflow-token-secret-name
+      value: $(params.workflow-token-secret-name)
+    - name: workflow-token-secret-key
+      value: $(params.workflow-token-secret-key)
+    - name: pr-token-secret-name
+      value: $(params.pr-token-secret-name)
+    - name: pr-token-secret-key
+      value: $(params.pr-token-secret-key)
+    - name: jenkins-url-secret-name
+      value: $(params.jenkins-url-secret-name)
+    - name: jenkins-url-secret-key
+      value: $(params.jenkins-url-secret-key)
+
+  # --------------------------------------------------------------------------
+  # 4b. Monitor (resume) — runs when check-ongoing-jobs found an active job
+  #     Receives job-url and correlation-id from check-ongoing-jobs results
+  # --------------------------------------------------------------------------
+  - name: monitor-resume
+    when:
+    - input: "$(tasks.check-ongoing-jobs.results.resume-from)"
+      operator: notin
+      values: ["none"]
+    runAfter:
+    - check-ongoing-jobs
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: e2e-early-gate/tasks/monitor-jenkins-job.yaml
+    params:
+    - name: queue-url
       value: $(tasks.check-ongoing-jobs.results.queue-url)
-    - name: job-url-from-check
+    - name: job-url
       value: $(tasks.check-ongoing-jobs.results.job-url)
     - name: correlation-id
       value: $(tasks.check-ongoing-jobs.results.correlation-id)

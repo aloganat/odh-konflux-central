@@ -228,6 +228,10 @@ spec:
         if [ -z "$corr_id" ]; then
           corr_id=$(echo "$body" | grep -oP '(?<=\*\*Correlation ID:\*\* )\S+' | head -1 || true)
         fi
+        # Table format used by complete comments: | **Correlation ID** | value |
+        if [ -z "$corr_id" ]; then
+          corr_id=$(echo "$body" | grep -oP '(?<=\*\*Correlation ID\*\* \| )\S+' | head -1 || true)
+        fi
         echo "$corr_id"
       }
 
@@ -248,7 +252,7 @@ spec:
       PAGE=1
       while true; do
         RESPONSE=$(gh_pr_api GET \
-          "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}")
+          "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}&sort=created&direction=desc")
 
         COUNT=$(echo "${RESPONSE}" | jq 'length')
         if [ "${COUNT}" -eq 0 ]; then

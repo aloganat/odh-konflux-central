@@ -12,16 +12,16 @@ spec:
     polls until the job completes, fetches the test summary from GitHub, and posts
     a final job-completion-comment on the PR.
   params:
-  - name: queue-url-from-check
-    description: Relative Jenkins queue path from check-ongoing-jobs (empty if not resuming from queue)
+  - name: queue-url
+    description: Relative Jenkins queue path (empty if resuming with a known job URL)
     type: string
     default: ""
-  - name: job-url-from-check
-    description: Relative Jenkins job path from check-ongoing-jobs (empty if not resuming from job)
+  - name: job-url
+    description: Relative Jenkins job path (empty for fresh runs)
     type: string
     default: ""
   - name: correlation-id
-    description: Correlation ID from check-ongoing-jobs (empty for fresh runs; extracted from PR comments instead)
+    description: Correlation ID for this pipeline run
     type: string
     default: ""
   - name: github-workflow-repo
@@ -108,11 +108,11 @@ spec:
       value: $(params.github-workflow-repo)
     - name: MONITOR_WORKFLOW
       value: $(params.monitor-workflow-file)
-    - name: QUEUE_URL_FROM_CHECK
-      value: $(params.queue-url-from-check)
-    - name: JOB_URL_FROM_CHECK
-      value: $(params.job-url-from-check)
-    - name: CORRELATION_ID_FROM_CHECK
+    - name: QUEUE_URL_PARAM
+      value: $(params.queue-url)
+    - name: JOB_URL_PARAM
+      value: $(params.job-url)
+    - name: CORRELATION_ID_PARAM
       value: $(params.correlation-id)
     - name: DELETE_INTERMEDIATE_COMMENTS
       value: $(params.delete-intermediate-comments)
@@ -139,9 +139,9 @@ spec:
 
       JENKINS_BASE_URL="${JENKINS_BASE_URL%/}"
 
-      JOB_URL="${JOB_URL_FROM_CHECK}"
-      QUEUE_URL="${QUEUE_URL_FROM_CHECK}"
-      CORRELATION_ID="${CORRELATION_ID_FROM_CHECK}"
+      JOB_URL="${JOB_URL_PARAM}"
+      QUEUE_URL="${QUEUE_URL_PARAM}"
+      CORRELATION_ID="${CORRELATION_ID_PARAM}"
 
       # Normalize: strip base URL if inputs are full URLs (backward compat with old PR comments)
       if [[ "${QUEUE_URL}" == ${JENKINS_BASE_URL}* ]]; then
@@ -152,9 +152,9 @@ spec:
       fi
 
       echo "monitor-jenkins-job starting"
-      echo "  QUEUE_URL_FROM_CHECK: ${QUEUE_URL_FROM_CHECK}"
-      echo "  JOB_URL_FROM_CHECK:   ${JOB_URL_FROM_CHECK}"
-      echo "  CORRELATION_ID:       ${CORRELATION_ID}"
+      echo "  QUEUE_URL:       ${QUEUE_URL}"
+      echo "  JOB_URL:         ${JOB_URL}"
+      echo "  CORRELATION_ID:  ${CORRELATION_ID}"
       echo "  FBC_TAG: ${FBC_TAG}"
 
       # ---------------------------------------------------------------
@@ -232,7 +232,8 @@ spec:
           if [ "${RUN_STATUS}" = "completed" ]; then
             if [ "${RUN_CONCLUSION}" != "success" ]; then
               echo "Monitor workflow run ${RUN_ID} completed with conclusion: ${RUN_CONCLUSION}" >&2
-              return 1
+              echo "${RUN_ID}"
+              return 2
             fi
             echo "${RUN_ID}"
             return 0
@@ -341,6 +342,46 @@ spec:
         done
       }
 
+      # Checks whether a failed monitor workflow run failed because the
+      # Jenkins queue item returned HTTP 404 (expired after job started).
+      check_queue_expired() {
+        local FAILED_RUN_ID="$1"
+        local FAILED_JOBS FAILED_JOB_IDS FJB_ID FAILED_LOGS
+        FAILED_JOBS=$(gh_workflow_api GET \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/runs/${FAILED_RUN_ID}/jobs" \
+          2>/dev/null || echo '{"jobs":[]}')
+        FAILED_JOB_IDS=$(echo "${FAILED_JOBS}" | jq -r '.jobs[].id')
+        for FJB_ID in ${FAILED_JOB_IDS}; do
+          FAILED_LOGS=$(gh_workflow_api GET \
+            "https://api.github.com/repos/${WORKFLOW_REPO}/actions/jobs/${FJB_ID}/logs" \
+            2>/dev/null || true)
+          if echo "${FAILED_LOGS}" | grep -q "Queue item no longer available"; then
+            return 0
+          fi
+        done
+        return 1
+      }
+
+      # Scans recent successful monitor workflow runs for a jenkins-job-url output.
+      # Sets JENKINS_JOB_URL on success.
+      scan_previous_runs_for_job_url() {
+        local RECENT_RUNS SUCCESSFUL_RUN_IDS PREV_RUN_ID PREV_URL
+        RECENT_RUNS=$(gh_workflow_api GET \
+          "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${MONITOR_WORKFLOW}/runs?per_page=10&status=completed&event=workflow_dispatch" \
+          2>/dev/null || echo '{"workflow_runs":[]}')
+        SUCCESSFUL_RUN_IDS=$(echo "${RECENT_RUNS}" | jq -r '[.workflow_runs[] | select(.conclusion == "success")] | .[0:5] | .[].id')
+        for PREV_RUN_ID in ${SUCCESSFUL_RUN_IDS}; do
+          PREV_URL=$(get_workflow_output "${PREV_RUN_ID}" "jenkins-job-url") || true
+          if [ -n "${PREV_URL}" ]; then
+            echo "Found job URL from previous workflow run ${PREV_RUN_ID}: ${PREV_URL}"
+            JENKINS_JOB_URL="${PREV_URL#${JENKINS_BASE_URL}}"
+            [[ "${JENKINS_JOB_URL}" == /* ]] || JENKINS_JOB_URL="/${JENKINS_JOB_URL}"
+            return 0
+          fi
+        done
+        return 1
+      }
+
       # ---------------------------------------------------------------
       # Phase A: Resolve Jenkins job URL from queue URL (if not already known)
       # ---------------------------------------------------------------
@@ -351,81 +392,63 @@ spec:
         echo ""
         echo "=== Phase A: Resolving Jenkins job URL from queue URL ==="
 
-        # If no queue URL from check-ongoing-jobs (fresh run), scan PR comments for
-        # the queue-url-comment posted by the trigger-test-pipeline task.
         if [ -z "${QUEUE_URL}" ]; then
-          echo "No queue URL from check-ongoing-jobs. Scanning PR comments for fresh queue-url-comment..."
-          CURRENT_USER=$(get_current_user)
-          for page in 1 2 3; do
-            PR_COMMENTS=$(gh_pr_api GET \
-              "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${page}&sort=created&direction=desc" \
-              2>/dev/null || echo '[]')
-            while IFS= read -r CJSON; do
-              CUSER=$(echo "${CJSON}" | jq -r '.user.login')
-              CBODY=$(echo "${CJSON}" | jq -r '.body')
-              [ "${CUSER}" != "${CURRENT_USER}" ] && continue
-              if echo "${CBODY}" | grep -q "^<!-- early-gate-queue-url "; then
-                QUEUE_URL=$(echo "${CBODY}" | grep -oP '(?<=queue_url=)[^ >]+' | head -1 || true)
-                if [ -z "${CORRELATION_ID}" ]; then
-                  CORRELATION_ID=$(echo "${CBODY}" | grep -oP '(?<=correlation_id=)[^ >]+' | head -1 || true)
-                  if [ -z "${CORRELATION_ID}" ]; then
-                    CORRELATION_ID=$(echo "${CBODY}" | grep -oP '(?<=\*\*Correlation ID:\*\* )\S+' | head -1 || true)
-                  fi
-                fi
-                [ -n "${QUEUE_URL}" ] && break 2
-              fi
-            done < <(echo "${PR_COMMENTS}" | jq -c '.[]')
-            [ "$(echo "${PR_COMMENTS}" | jq 'length')" -lt 100 ] && break
-          done
+          echo "ERROR: No queue URL or job URL provided."
+          exit 1
+        fi
 
-          if [ -z "${QUEUE_URL}" ]; then
-            echo "ERROR: No queue URL available from check-ongoing-jobs or PR comments."
-            exit 1
-          fi
-          echo "Extracted correlation ID: ${CORRELATION_ID}"
+        if [ -z "${CORRELATION_ID}" ]; then
+          echo "ERROR: No correlation ID provided."
+          exit 1
         fi
 
         echo "Using queue URL: ${QUEUE_URL}"
 
         for phase_a_attempt in $(seq 1 20); do
-          RUN_ID=$(dispatch_monitor_workflow "queue-url" "${JENKINS_BASE_URL}${QUEUE_URL}") || {
-            CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
-            echo "Monitor workflow dispatch/wait failed (failure ${CONSECUTIVE_FAILURES}/5)"
-            if [ "${CONSECUTIVE_FAILURES}" -ge 5 ]; then
-              echo "Queue resolution failed 5 times. Scanning previous workflow runs for an already-resolved job URL..."
-              # Fallback: scan recent monitor workflow runs that may have already resolved the job URL
-              RECENT_RUNS=$(gh_workflow_api GET \
-                "https://api.github.com/repos/${WORKFLOW_REPO}/actions/workflows/${MONITOR_WORKFLOW}/runs?per_page=10&status=completed&event=workflow_dispatch" \
-                2>/dev/null || echo '{"workflow_runs":[]}')
-              SUCCESSFUL_RUN_IDS=$(echo "${RECENT_RUNS}" | jq -r '[.workflow_runs[] | select(.conclusion == "success")] | .[0:5] | .[].id')
-              for PREV_RUN_ID in ${SUCCESSFUL_RUN_IDS}; do
-                PREV_URL=$(get_workflow_output "${PREV_RUN_ID}" "jenkins-job-url")
-                if [ -n "${PREV_URL}" ]; then
-                  echo "Found job URL from previous workflow run ${PREV_RUN_ID}: ${PREV_URL}"
-                  JENKINS_JOB_URL="${PREV_URL#${JENKINS_BASE_URL}}"
-                  [[ "${JENKINS_JOB_URL}" == /* ]] || JENKINS_JOB_URL="/${JENKINS_JOB_URL}"
-                  break 2
-                fi
-              done
-              echo "ERROR: Could not resolve Jenkins job URL from queue or previous runs."
-              exit 1
+          DISPATCH_RC=0
+          RUN_ID=$(dispatch_monitor_workflow "queue-url" "${JENKINS_BASE_URL}${QUEUE_URL}") || DISPATCH_RC=$?
+
+          if [ ${DISPATCH_RC} -eq 0 ]; then
+            CONSECUTIVE_FAILURES=0
+            JENKINS_JOB_URL_FULL=$(get_workflow_output "${RUN_ID}" "jenkins-job-url") || true
+
+            if [ -n "${JENKINS_JOB_URL_FULL}" ]; then
+              JENKINS_JOB_URL="${JENKINS_JOB_URL_FULL#${JENKINS_BASE_URL}}"
+              [[ "${JENKINS_JOB_URL}" == /* ]] || JENKINS_JOB_URL="/${JENKINS_JOB_URL}"
+              echo "Jenkins job URL resolved (relative): ${JENKINS_JOB_URL}"
+              break
             fi
-            echo "Retrying in ${QUEUE_URL_POLL_INTERVAL}s..."
+
+            echo "Job URL not yet available, retrying in ${QUEUE_URL_POLL_INTERVAL}s..."
             sleep "${QUEUE_URL_POLL_INTERVAL}"
             continue
-          }
-
-          CONSECUTIVE_FAILURES=0
-          JENKINS_JOB_URL_FULL=$(get_workflow_output "${RUN_ID}" "jenkins-job-url")
-
-          if [ -n "${JENKINS_JOB_URL_FULL}" ]; then
-            JENKINS_JOB_URL="${JENKINS_JOB_URL_FULL#${JENKINS_BASE_URL}}"
-            [[ "${JENKINS_JOB_URL}" == /* ]] || JENKINS_JOB_URL="/${JENKINS_JOB_URL}"
-            echo "Jenkins job URL resolved (relative): ${JENKINS_JOB_URL}"
-            break
           fi
 
-          echo "Job URL not yet available, retrying in ${QUEUE_URL_POLL_INTERVAL}s..."
+          # Workflow completed but failed — check for queue item expiry (404)
+          if [ ${DISPATCH_RC} -eq 2 ] && [ -n "${RUN_ID}" ]; then
+            if check_queue_expired "${RUN_ID}"; then
+              echo "Queue item expired (404). The job has started but the queue item is no longer available."
+              echo "Scanning previous workflow runs for an already-resolved job URL..."
+              if scan_previous_runs_for_job_url; then
+                break
+              fi
+              echo "ERROR: Queue item expired and job URL not found in previous workflow runs."
+              exit 1
+            fi
+          fi
+
+          # Dispatch or timeout failure — retry with backoff
+          CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
+          echo "Monitor workflow dispatch/wait failed (failure ${CONSECUTIVE_FAILURES}/5)"
+          if [ "${CONSECUTIVE_FAILURES}" -ge 5 ]; then
+            echo "Queue resolution failed 5 times. Scanning previous workflow runs..."
+            if scan_previous_runs_for_job_url; then
+              break
+            fi
+            echo "ERROR: Could not resolve Jenkins job URL from queue or previous runs."
+            exit 1
+          fi
+          echo "Retrying in ${QUEUE_URL_POLL_INTERVAL}s..."
           sleep "${QUEUE_URL_POLL_INTERVAL}"
         done
 
