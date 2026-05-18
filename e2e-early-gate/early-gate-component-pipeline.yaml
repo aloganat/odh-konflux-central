@@ -34,10 +34,6 @@ spec:
     type: string
     default: "7d"
     description: Image tag expiration time (e.g. 1h, 2d, 3w)
-  - name: enable-slack-failure-notification
-    type: string
-    default: "false"
-    description: Send slack notification on failure
 
   # --- Operator build ---
   - name: operator-git-url
@@ -1043,41 +1039,6 @@ spec:
       - name: kind
         value: task
       resolver: bundles
-
-  # ==========================================================================
-  # FINALLY
-  # ==========================================================================
-  finally:
-  - name: send-slack-notification
-    params:
-    - name: message
-      value: "$(tasks.rhoai-init.results.slack-message-failure-text)"
-    - name: secret-name
-      value: ci-slack-secret
-    - name: key-name
-      value: secret
-    taskRef:
-      params:
-      - name: name
-        value: slack-webhook-notification
-      - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-slack-webhook-notification:0.1@sha256:69945a30c11387a766e3d0ae33991b68e865a290c09da1fea44f193d358926ba
-      - name: kind
-        value: task
-      resolver: bundles
-    when:
-    - input: $(tasks.status)
-      operator: in
-      values:
-      - "Failed"
-    - input: $(tasks.rhoai-init.results.skip-slack-message)
-      operator: in
-      values:
-      - "false"
-    - input: $(params.enable-slack-failure-notification)
-      operator: in
-      values:
-      - "true"
 
   workspaces:
   - name: git-auth
