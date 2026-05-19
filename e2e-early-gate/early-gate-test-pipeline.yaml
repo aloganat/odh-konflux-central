@@ -85,7 +85,7 @@ spec:
   - name: delete-intermediate-comments
     type: string
     description: "Delete intermediate PR comments (queue-url, job-url) once superseded. When true, comments include a note that they will be replaced."
-    default: "false"
+    default: "true"
 
   # ==========================================================================
   # TASKS
