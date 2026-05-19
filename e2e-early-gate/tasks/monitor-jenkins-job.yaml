@@ -585,11 +585,23 @@ spec:
 
       # Build and post completion comment
       if [ "${SUMMARY_VALID}" = "true" ]; then
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n| **Results** | [early-gate-test-summary.yaml](%s) |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
-          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}" \
-          "${PASSED_COUNT}" "${FAILED_COUNT}" "${SKIPPED_COUNT}" "${TOTAL_COUNT}")
+        if [ "${FAILED_COUNT}" -eq 0 ]; then
+          RESULT_ICON=":white_check_mark:"
+          STATUS_DISPLAY="${RESULT_ICON} ${FINAL_STATUS}"
+        else
+          RESULT_ICON=":x:"
+          STATUS_DISPLAY="${RESULT_ICON} FAILED — ${FAILED_COUNT} test(s) failed"
+        fi
+        if [ "${FAILED_COUNT}" -gt 0 ]; then
+          FAILED_DISPLAY='$\\color{red}{\\textsf{'"${FAILED_COUNT}"'}}$'
+        else
+          FAILED_DISPLAY="${FAILED_COUNT}"
+        fi
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n%s **Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n| **Results** | [early-gate-test-summary.yaml](%s) |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
+          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${RESULT_ICON}" "${JENKINS_JOB_URL}" "${STATUS_DISPLAY}" "${FBC_TAG}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}" \
+          "${PASSED_COUNT}" "${FAILED_DISPLAY}" "${SKIPPED_COUNT}" "${TOTAL_COUNT}")
       else
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n**Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n[early-gate-test-summary.yaml](%s)' \
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n:warning: **Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | :warning: %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n[early-gate-test-summary.yaml](%s)' \
           "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}")
       fi
 
