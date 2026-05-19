@@ -548,9 +548,9 @@ spec:
           continue
         fi
 
-        JOB_URL_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.job_url // ""')
-        FBC_TAG_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.fbc_tag // ""')
-        CORR_ID_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.correlation_id // ""')
+        JOB_URL_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.job_url // ""' | sed 's/^"//; s/"$//')
+        FBC_TAG_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.fbc_tag // ""' | sed 's/^"//; s/"$//')
+        CORR_ID_IN_SUMMARY=$(echo "${RAW_SUMMARY}" | yq '.correlation_id // ""' | sed 's/^"//; s/"$//')
 
         # Strip base URL from summary if present (backward compat with full URLs)
         JOB_URL_IN_SUMMARY_REL="${JOB_URL_IN_SUMMARY#${JENKINS_BASE_URL}}"
