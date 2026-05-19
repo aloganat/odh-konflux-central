@@ -141,6 +141,10 @@ spec:
     type: string
     default: "odh-stable"
     description: Quay tag used for image lookups by processors
+  - name: enable-early-gate-testing
+    type: string
+    default: "false"
+    description: Triggers early gate test pipeline on comment /early-gate-test
 
   results:
   - name: OPERATOR_IMAGE_URL
@@ -1039,6 +1043,31 @@ spec:
       - name: kind
         value: task
       resolver: bundles
+
+  # --------------------------------------------------------------------------
+  # Trigger early-gate test pipeline
+  # --------------------------------------------------------------------------
+  - name: trigger-early-gate-test
+    runAfter:
+    - validate-fbc
+    - apply-tags-fbc
+    workspaces:
+    - name: basic-auth
+      workspace: git-auth
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: konflux-tekton-tasks/trigger-early-gate-test/0.1/trigger-early-gate-test.yaml
+    when:
+    - input: $(params.enable-early-gate-testing)
+      operator: in
+      values:
+      - "true"
 
   workspaces:
   - name: git-auth
