@@ -11,7 +11,7 @@ spec:
   # --- Group snapshot ---
   - name: group-components
     type: string
-    description: List of components in the group (JSON) 
+    description: List of components in the group (JSON)
     default: ""
 
   # --- General ---
@@ -34,10 +34,6 @@ spec:
     type: string
     default: "7d"
     description: Image tag expiration time (e.g. 1h, 2d, 3w)
-  - name: enable-slack-failure-notification
-    type: string
-    default: "false"
-    description: Send slack notification on failure
 
   # --- Operator build ---
   - name: operator-git-url
@@ -145,6 +141,10 @@ spec:
     type: string
     default: "odh-stable"
     description: Quay tag used for image lookups by processors
+  - name: enable-early-gate-testing
+    type: string
+    default: "true"
+    description: Triggers early gate test pipeline on comment /early-gate-test
 
   results:
   - name: OPERATOR_IMAGE_URL
@@ -550,8 +550,6 @@ spec:
       value: $(params.bundle-build-args-file)
     - name: SOURCE_URL
       value: $(tasks.clone-build-config-repo.results.url)
-    - name: BUILDAH_FORMAT
-      value: docker
     - name: SOURCE_ARTIFACT
       value: $(tasks.prefetch-dependencies-bundle.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
@@ -688,8 +686,6 @@ spec:
       value: $(params.catalog-build-args-file)
     - name: SOURCE_URL
       value: $(tasks.clone-build-config-repo.results.url)
-    - name: BUILDAH_FORMAT
-      value: docker
     - name: SOURCE_ARTIFACT
       value: $(tasks.prefetch-dependencies-fbc.results.SOURCE_ARTIFACT)
     - name: CACHI2_ARTIFACT
@@ -751,42 +747,32 @@ spec:
       - name: name
         value: validate-fbc
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-validate-fbc:0.1@sha256:2a99dbde96bca33d414a96acc5ab39886b53d91c37ef8bd872ea47bfbe1b319f
+        value: quay.io/konflux-ci/tekton-catalog/task-validate-fbc:0.1@sha256:291cbcce7d965831dd5027caad5f47ac4146b6fac0a51358f2ad64603a008436
       - name: kind
         value: task
       resolver: bundles
 
-  # ==========================================================================
-  # FINALLY
-  # ==========================================================================
-  finally:
-  - name: send-slack-notification
-    params:
-    - name: message
-      value: "$(tasks.rhoai-init.results.slack-message-failure-text)"
-    - name: secret-name
-      value: ci-slack-secret
-    - name: key-name
-      value: secret
+  # --------------------------------------------------------------------------
+  # Trigger early-gate test pipeline
+  # --------------------------------------------------------------------------
+  - name: trigger-early-gate-test
+    runAfter:
+    - validate-fbc
+    - apply-tags-fbc
+    workspaces:
+    - name: basic-auth
+      workspace: git-auth
     taskRef:
+      resolver: git
       params:
-      - name: name
-        value: slack-webhook-notification
-      - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-slack-webhook-notification:0.1@sha256:69945a30c11387a766e3d0ae33991b68e865a290c09da1fea44f193d358926ba
-      - name: kind
-        value: task
-      resolver: bundles
+      - name: url
+        value: https://github.com/red-hat-data-services/rhoai-konflux-tasks.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: konflux-tekton-tasks/trigger-early-gate-test/0.1/trigger-early-gate-test.yaml
     when:
-    - input: $(tasks.status)
-      operator: in
-      values:
-      - "Failed"
-    - input: $(tasks.rhoai-init.results.skip-slack-message)
-      operator: in
-      values:
-      - "false"
-    - input: $(params.enable-slack-failure-notification)
+    - input: $(params.enable-early-gate-testing)
       operator: in
       values:
       - "true"
