@@ -1,7 +1,13 @@
-# Early Gate Component Pipeline — Design Document
+# Early Gate Build Pipeline — Design Document
 
-**Pipeline name:** `early-gate-e2e-pipeline`
-**Source:** `e2e-early-gate/early-gate-component-pipeline.yaml`
+There are two variants of this pipeline sharing the same design:
+
+| Pipeline | Tekton Name | Source | Triggered By |
+|----------|-------------|--------|--------------|
+| **Component pipeline** | `early-gate-component-pipeline` | `e2e-early-gate/early-gate-component-pipeline.yaml` | Component PR (e.g., feast, model-mesh) |
+| **Operator pipeline** | `early-gate-operator-pipeline` | `e2e-early-gate/early-gate-operator-pipeline.yaml` | Operator PR |
+
+Both pipelines follow the same structure described in this document. The only difference is which repository triggers them — component PRs trigger the component pipeline, and operator PRs trigger the operator pipeline.
 
 ---
 

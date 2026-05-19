@@ -9,7 +9,7 @@
 
 This Tekton pipeline orchestrates an early-gate smoke test for pull requests by triggering a Jenkins job, monitoring it to completion, and posting test results back to the PR as GitHub comments. It is designed to be **idempotent** — if the pipeline is interrupted and re-run, it detects the in-progress Jenkins job from the previous run and resumes monitoring it instead of triggering a duplicate.
 
-The pipeline is triggered downstream by the component pipeline (`early-gate-e2e-pipeline`) after all images are built.
+The pipeline is triggered downstream by the build pipeline (`early-gate-component-pipeline` or `early-gate-operator-pipeline`) after all images are built.
 
 ---
 
@@ -424,7 +424,7 @@ sequenceDiagram
 
 | Failure | Behavior |
 |---------|----------|
-| Image not found after 3 retries | Pipeline aborts with instructions to check component pipeline |
+| Image not found after 3 retries | Pipeline aborts with instructions to check build pipeline |
 
 ### trigger-test-pipeline
 
