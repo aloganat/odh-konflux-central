@@ -252,22 +252,38 @@ spec:
       FIRST_CORR_ID=""
       DONE_SCANNING=false
 
-      PAGE=1
-      while true; do
+      # GitHub Issues Comments API returns ascending order and does not
+      # support sort/direction params. To scan newest-first we find the
+      # last page, then iterate pages backwards, reversing each page.
+      FIRST_PAGE=$(gh_pr_api GET \
+        "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=1" \
+        2>/dev/null | jq 'length')
+      if [ "${FIRST_PAGE}" -eq 100 ]; then
+        # More than one page — probe to find the last page (cap at 5)
+        LAST_PAGE=1
+        for p in 2 3 4 5; do
+          PROBE=$(gh_pr_api GET \
+            "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${p}" \
+            2>/dev/null | jq 'length')
+          if [ "${PROBE}" -eq 0 ]; then break; fi
+          LAST_PAGE=${p}
+        done
+      else
+        LAST_PAGE=1
+      fi
+
+      PAGE=${LAST_PAGE}
+      while [ "${PAGE}" -ge 1 ]; do
         RESPONSE=$(gh_pr_api GET \
-          "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}&sort=created&direction=desc")
+          "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments?per_page=100&page=${PAGE}")
 
         COUNT=$(echo "${RESPONSE}" | jq 'length')
         if [ "${COUNT}" -eq 0 ]; then
-          break
+          PAGE=$((PAGE - 1))
+          continue
         fi
 
         while IFS= read -r COMMENT_JSON; do
-          USER=$(echo "${COMMENT_JSON}" | jq -r '.user.login')
-          if [ "${USER}" != "${CURRENT_USER}" ]; then
-            continue
-          fi
-
           BODY=$(echo "${COMMENT_JSON}" | jq -r '.body')
           CREATED_AT=$(echo "${COMMENT_JSON}" | jq -r '.created_at')
           CORR_ID=""
@@ -305,17 +321,13 @@ spec:
             fi
           fi
 
-        done < <(echo "${RESPONSE}" | jq -c '.[]')
+        done < <(echo "${RESPONSE}" | jq -c --arg user "${CURRENT_USER}" '[.[] | select(.user.login == $user)] | reverse | .[]')
 
         if [ "${DONE_SCANNING}" = true ]; then
           break
         fi
 
-        PAGE=$((PAGE + 1))
-        # Safety limit: scan up to 500 comments
-        if [ "${PAGE}" -gt 5 ]; then
-          break
-        fi
+        PAGE=$((PAGE - 1))
       done
 
       # ---------------------------------------------------------------
