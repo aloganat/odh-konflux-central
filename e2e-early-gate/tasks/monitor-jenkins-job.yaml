@@ -540,7 +540,7 @@ spec:
 
       for attempt in 1 2 3 4 5; do
         echo "Attempt ${attempt}/5: downloading summary..."
-        RAW_SUMMARY=$(curl -sSf "${SUMMARY_RAW_URL}" 2>/dev/null || true)
+        RAW_SUMMARY=$(curl -sSf "${SUMMARY_RAW_URL}?cb=$(date +%s)" 2>/dev/null || true)
 
         if [ -z "${RAW_SUMMARY}" ]; then
           echo "Summary not yet available, waiting 30s..."
