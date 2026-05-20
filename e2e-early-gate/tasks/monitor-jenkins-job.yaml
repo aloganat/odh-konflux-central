@@ -533,9 +533,9 @@ spec:
       echo ""
       echo "=== Phase C: Fetching test summary ==="
 
-      SUMMARY_RAW_URL="https://raw.githubusercontent.com/opendatahub-io/odh-build-metadata/early-gate/${REPO_NAME}/${PR_NUMBER}/early-gate-test-summary.yaml"
+      SUMMARY_API_URL="https://api.github.com/repos/opendatahub-io/odh-build-metadata/contents/${REPO_NAME}/${PR_NUMBER}/early-gate-test-summary.yaml?ref=early-gate"
       SUMMARY_DISPLAY_URL="https://github.com/opendatahub-io/odh-build-metadata/blob/early-gate/${REPO_NAME}/${PR_NUMBER}/early-gate-test-summary.yaml"
-      echo "Summary URL: ${SUMMARY_RAW_URL}"
+      echo "Summary API URL: ${SUMMARY_API_URL}"
 
       SUMMARY_VALID=false
       SUMMARY=""
@@ -545,8 +545,15 @@ spec:
       TOTAL_COUNT=0
 
       for attempt in 1 2 3 4 5; do
-        echo "Attempt ${attempt}/5: downloading summary..."
-        RAW_SUMMARY=$(curl -sSf "${SUMMARY_RAW_URL}?cb=$(date +%s)" 2>/dev/null || true)
+        echo "Attempt ${attempt}/5: downloading summary via GitHub API..."
+        API_RESPONSE=$(curl -sSf \
+          -H "Authorization: Bearer ${WORKFLOW_GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${SUMMARY_API_URL}" 2>/dev/null || true)
+        RAW_SUMMARY=""
+        if [ -n "${API_RESPONSE}" ]; then
+          RAW_SUMMARY=$(echo "${API_RESPONSE}" | jq -r '.content // empty' | base64 -d 2>/dev/null || true)
+        fi
 
         if [ -z "${RAW_SUMMARY}" ]; then
           echo "Summary not yet available, waiting ${SUMMARY_POLL_INTERVAL}s..."

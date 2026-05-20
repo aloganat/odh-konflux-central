@@ -188,6 +188,7 @@ spec:
   #     Receives queue-url and correlation-id from trigger-test-pipeline results
   # --------------------------------------------------------------------------
   - name: monitor-fresh
+    timeout: 4h
     when:
     - input: "$(tasks.check-ongoing-jobs.results.resume-from)"
       operator: in
@@ -238,6 +239,7 @@ spec:
   #     Receives job-url and correlation-id from check-ongoing-jobs results
   # --------------------------------------------------------------------------
   - name: monitor-resume
+    timeout: 4h
     when:
     - input: "$(tasks.check-ongoing-jobs.results.resume-from)"
       operator: notin
