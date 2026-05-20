@@ -544,7 +544,7 @@ spec:
       SKIPPED_COUNT=0
       TOTAL_COUNT=0
 
-      for attempt in 1 2 3 4 5; do
+      for attempt in 1 2 3 4 5 6 7 8 9 10; do
         echo "Attempt ${attempt}/5: downloading summary via GitHub API..."
         API_RESPONSE=$(curl -sSf \
           -H "Authorization: Bearer ${WORKFLOW_GITHUB_TOKEN}" \
