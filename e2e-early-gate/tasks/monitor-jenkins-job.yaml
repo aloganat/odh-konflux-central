@@ -597,13 +597,24 @@ spec:
       done
 
       # Build and post completion comment
+      LOWER_FINAL_STATUS=$(echo "${FINAL_STATUS}" | tr '[:upper:]' '[:lower:]')
+      IS_JOB_FAILURE=false
+      if [ "${LOWER_FINAL_STATUS}" = "failure" ] || [ "${LOWER_FINAL_STATUS}" = "failed" ] || \
+         [ "${LOWER_FINAL_STATUS}" = "aborted" ] || [ "${LOWER_FINAL_STATUS}" = "unstable" ] || \
+         [ "${LOWER_FINAL_STATUS}" = "not_built" ]; then
+        IS_JOB_FAILURE=true
+      fi
+
       if [ "${SUMMARY_VALID}" = "true" ]; then
-        if [ "${FAILED_COUNT}" -eq 0 ]; then
-          RESULT_ICON=":white_check_mark:"
+        if [ "${IS_JOB_FAILURE}" = "true" ]; then
+          RESULT_ICON=":x:"
           STATUS_DISPLAY="${RESULT_ICON} ${FINAL_STATUS}"
-        else
+        elif [ "${FAILED_COUNT}" -gt 0 ]; then
           RESULT_ICON=":x:"
           STATUS_DISPLAY="${RESULT_ICON} FAILED — ${FAILED_COUNT} test(s) failed"
+        else
+          RESULT_ICON=":white_check_mark:"
+          STATUS_DISPLAY="${RESULT_ICON} ${FINAL_STATUS}"
         fi
         if [ "${FAILED_COUNT}" -gt 0 ]; then
           FAILED_DISPLAY='$\\color{red}{\\textsf{'"${FAILED_COUNT}"'}}$'
