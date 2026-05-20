@@ -90,6 +90,10 @@ spec:
         secretKeyRef:
           name: $(params.jenkins-url-secret-name)
           key: $(params.jenkins-url-secret-key)
+    - name: SENDER
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.annotations['pipelinesascode.tekton.dev/sender']
     - name: WORKFLOW_REPO
       value: $(params.github-workflow-repo)
     - name: MONITOR_WORKFLOW
@@ -101,6 +105,18 @@ spec:
       OWNER="${REPO_ORG}"
       REPO="${REPO_URL}"
       JENKINS_BASE_URL="${JENKINS_BASE_URL%/}"
+
+      # ---------------------------------------------------------------
+      # Auto-triggered runs (sender=rhods-ci-bot) always start fresh
+      # ---------------------------------------------------------------
+      if [ "${SENDER}" = "rhods-ci-bot" ]; then
+        echo "Sender is rhods-ci-bot (auto-trigger). Forcing fresh Jenkins job."
+        printf '%s' "none"  > "$(results.resume-from.path)"
+        printf '%s' ""      > "$(results.queue-url.path)"
+        printf '%s' ""      > "$(results.job-url.path)"
+        printf '%s' ""      > "$(results.correlation-id.path)"
+        exit 0
+      fi
 
       # ---------------------------------------------------------------
       # Helper functions
