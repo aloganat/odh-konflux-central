@@ -138,15 +138,6 @@ spec:
   - description: ""
     name: CHAINS-GIT_COMMIT
     value: $(tasks.clone-repository.results.commit)
-  taskRunSpecs:
-    - pipelineTaskName: sast-shell-check
-      computeResources:
-        requests:
-          cpu: '2'
-          memory: 16Gi
-        limits:
-          cpu: '2'
-          memory: 16Gi
   tasks:
   - name: rhoai-init
     params:
