@@ -44,6 +44,10 @@ spec:
     description: Seconds to wait between monitor-workflow invocations while polling for Jenkins job completion (Phase B)
     type: string
     default: "30"
+  - name: summary-poll-interval
+    description: Seconds to wait between attempts when downloading and validating the test summary from GitHub (Phase C)
+    type: string
+    default: "30"
   - name: workflow-token-secret-name
     description: Name of the Kubernetes secret containing the GitHub token for interacting with GitHub Actions workflows
     type: string
@@ -120,6 +124,8 @@ spec:
       value: $(params.queue-url-poll-interval)
     - name: JOB_STATUS_POLL_INTERVAL
       value: $(params.job-status-poll-interval)
+    - name: SUMMARY_POLL_INTERVAL
+      value: $(params.summary-poll-interval)
     - name: JENKINS_BASE_URL
       valueFrom:
         secretKeyRef:
@@ -543,8 +549,8 @@ spec:
         RAW_SUMMARY=$(curl -sSf "${SUMMARY_RAW_URL}?cb=$(date +%s)" 2>/dev/null || true)
 
         if [ -z "${RAW_SUMMARY}" ]; then
-          echo "Summary not yet available, waiting 30s..."
-          sleep 30
+          echo "Summary not yet available, waiting ${SUMMARY_POLL_INTERVAL}s..."
+          sleep "${SUMMARY_POLL_INTERVAL}"
           continue
         fi
 
@@ -558,15 +564,15 @@ spec:
 
         if [ "${JENKINS_JOB_URL}" != "${JOB_URL_IN_SUMMARY_REL}" ]; then
           echo "WARNING: job_url mismatch: summary='${JOB_URL_IN_SUMMARY}' vs job='${JENKINS_JOB_URL}'"
-          echo "Retrying in 30s (may be a stale result from a previous run)..."
-          sleep 30
+          echo "Retrying in ${SUMMARY_POLL_INTERVAL}s (may be a stale result from a previous run)..."
+          sleep "${SUMMARY_POLL_INTERVAL}"
           continue
         fi
 
         if [ "${FBC_TAG_IN_SUMMARY}" != "${FBC_TAG}" ]; then
           echo "WARNING: fbc_tag mismatch: summary='${FBC_TAG_IN_SUMMARY}' vs expected='${FBC_TAG}'"
-          echo "Retrying in 30s..."
-          sleep 30
+          echo "Retrying in ${SUMMARY_POLL_INTERVAL}s..."
+          sleep "${SUMMARY_POLL_INTERVAL}"
           continue
         fi
 

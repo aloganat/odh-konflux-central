@@ -37,7 +37,7 @@ spec:
   - name: trigger-workflow-file
     type: string
     description: Workflow filename for triggering the Jenkins job
-    default: dummy-earlygate-smoke-trigger.yaml
+    default: earlygate-smoke-trigger.yaml
   - name: monitor-workflow-file
     type: string
     description: Workflow filename for monitoring the Jenkins job
@@ -47,11 +47,15 @@ spec:
   - name: queue-url-poll-interval
     type: string
     description: Seconds between monitor-workflow invocations while resolving the Jenkins job URL from the queue
-    default: "30"
+    default: "120"
   - name: job-status-poll-interval
     type: string
     description: Seconds between monitor-workflow invocations while polling for Jenkins job completion
-    default: "30"
+    default: "300"
+  - name: summary-poll-interval
+    type: string
+    description: Seconds between attempts when downloading and validating the test summary from GitHub
+    default: "60"
 
   # --- Secret config ---
   - name: workflow-token-secret-name
@@ -214,6 +218,8 @@ spec:
       value: $(params.delete-intermediate-comments)
     - name: job-status-poll-interval
       value: $(params.job-status-poll-interval)
+    - name: summary-poll-interval
+      value: $(params.summary-poll-interval)
     - name: workflow-token-secret-name
       value: $(params.workflow-token-secret-name)
     - name: workflow-token-secret-key
@@ -264,6 +270,8 @@ spec:
       value: $(params.delete-intermediate-comments)
     - name: job-status-poll-interval
       value: $(params.job-status-poll-interval)
+    - name: summary-poll-interval
+      value: $(params.summary-poll-interval)
     - name: workflow-token-secret-name
       value: $(params.workflow-token-secret-name)
     - name: workflow-token-secret-key

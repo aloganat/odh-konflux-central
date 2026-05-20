@@ -1,6 +1,6 @@
 # Early Gate Testing — User Guide
 
-Early gate testing is a pre-merge smoke testing infrastructure for ODH/RHOAI. It validates that a pull request does not break core functionality by building a complete set of OLM artifacts (operator, bundle, and FBC catalog) using the PR's latest images and running smoke tests against them — all before the PR is merged.
+Early gate testing is a pre-merge smoke testing infrastructure for ODH. It validates that a pull request does not break core functionality by building a complete set of OLM artifacts (operator, bundle, and FBC catalog) using the PR's latest images and running smoke tests against them — all before the PR is merged.
 
 ---
 
