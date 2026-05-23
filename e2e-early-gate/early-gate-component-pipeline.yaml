@@ -1051,66 +1051,22 @@ spec:
     runAfter:
     - validate-fbc
     - apply-tags-fbc
-    taskSpec:
-      params:
-      - name: CATALOG_IMAGE_URL
-      - name: CATALOG_IMAGE_DIGEST
-      results:
-      - name: fbc-image
-        description: Fully qualified FBC image reference with digest
-      steps:
-      - name: post-comment
-        image: quay.io/konflux-ci/konflux-test:stable
-        env:
-        - name: PR_NUMBER
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.labels['pipelinesascode.tekton.dev/pull-request']
-        - name: REPO_URL
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-repository']
-        - name: REPO_ORG
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.annotations['pipelinesascode.tekton.dev/url-org']
-        - name: PR_GITHUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: odh-github-secret
-              key: commenter-token
-        - name: CATALOG_IMAGE_URL
-          value: $(params.CATALOG_IMAGE_URL)
-        - name: CATALOG_IMAGE_DIGEST
-          value: $(params.CATALOG_IMAGE_DIGEST)
-        script: |
-          #!/bin/bash
-          set -euo pipefail
-
-          OWNER="${REPO_ORG}"
-          REPO="${REPO_URL}"
-
-          FBC_IMAGE="${CATALOG_IMAGE_URL}@${CATALOG_IMAGE_DIGEST}"
-          echo "FBC_IMAGE: ${FBC_IMAGE}"
-          printf '%s' "${FBC_IMAGE}" > "$(results.fbc-image.path)"
-
-          COMMENT_BODY=$(printf '<!-- early-gate-build-complete -->\n:white_check_mark: **Early Gate Build - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Status** | :white_check_mark: SUCCESS |\n| **FBC Image** | %s |' \
-            "${FBC_IMAGE}")
-
-          curl -sSf \
-            -X POST \
-            -H "Authorization: Bearer ${PR_GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" \
-            -d "{\"body\":$(echo "${COMMENT_BODY}" | jq -Rs .)}" \
-            2>/dev/null || echo "WARNING: Failed to post PR comment (non-fatal)"
-
-          echo "Posted build-complete comment on PR #${PR_NUMBER}"
     params:
-    - name: CATALOG_IMAGE_URL
+    - name: catalog-image-url
       value: $(tasks.build-fbc-container.results.IMAGE_URL)
-    - name: CATALOG_IMAGE_DIGEST
+    - name: catalog-image-digest
       value: $(tasks.build-fbc-container.results.IMAGE_DIGEST)
+    - name: unique-tag
+      value: $(tasks.rhoai-init.results.unique-tag)
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: e2e-early-gate/tasks/post-build-complete-comment.yaml
 
   # --------------------------------------------------------------------------
   # Trigger early-gate test pipeline

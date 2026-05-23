@@ -753,12 +753,35 @@ spec:
       resolver: bundles
 
   # --------------------------------------------------------------------------
+  # Post build-complete comment on PR
+  # --------------------------------------------------------------------------
+  - name: post-build-complete-comment
+    runAfter:
+    - validate-fbc
+    - apply-tags-fbc
+    params:
+    - name: catalog-image-url
+      value: $(tasks.build-fbc-container.results.IMAGE_URL)
+    - name: catalog-image-digest
+      value: $(tasks.build-fbc-container.results.IMAGE_DIGEST)
+    - name: unique-tag
+      value: $(tasks.rhoai-init.results.unique-tag)
+    taskRef:
+      resolver: git
+      params:
+      - name: url
+        value: https://github.com/opendatahub-io/odh-konflux-central.git
+      - name: revision
+        value: earlygate
+      - name: pathInRepo
+        value: e2e-early-gate/tasks/post-build-complete-comment.yaml
+
+  # --------------------------------------------------------------------------
   # Trigger early-gate test pipeline
   # --------------------------------------------------------------------------
   - name: trigger-early-gate-test
     runAfter:
-    - validate-fbc
-    - apply-tags-fbc
+    - post-build-complete-comment
     workspaces:
     - name: basic-auth
       workspace: git-auth
