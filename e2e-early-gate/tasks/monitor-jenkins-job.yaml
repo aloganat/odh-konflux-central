@@ -142,6 +142,14 @@ spec:
       WORKFLOW_REPO_NAME="${WORKFLOW_REPO##*/}"
 
       FBC_TAG="odh-pr-${PR_NUMBER}-${REPO_NAME}"
+      FBC_REPO="quay.io/opendatahub/opendatahub-operator-catalog"
+      FBC_DIGEST=$(skopeo inspect --no-tags "docker://${FBC_REPO}:${FBC_TAG}" 2>/dev/null | jq -r '.Digest // empty' || true)
+      if [ -n "${FBC_DIGEST}" ]; then
+        FBC_IMAGE="${FBC_REPO}:${FBC_TAG}@${FBC_DIGEST}"
+      else
+        echo "WARNING: Could not resolve digest for ${FBC_REPO}:${FBC_TAG}. Using tag only."
+        FBC_IMAGE="${FBC_REPO}:${FBC_TAG}"
+      fi
 
       JENKINS_BASE_URL="${JENKINS_BASE_URL%/}"
 
@@ -161,7 +169,7 @@ spec:
       echo "  QUEUE_URL:       ${QUEUE_URL}"
       echo "  JOB_URL:         ${JOB_URL}"
       echo "  CORRELATION_ID:  ${CORRELATION_ID}"
-      echo "  FBC_TAG: ${FBC_TAG}"
+      echo "  FBC_IMAGE: ${FBC_IMAGE}"
 
       # ---------------------------------------------------------------
       # Helper functions
@@ -469,8 +477,8 @@ spec:
           REPLACE_NOTE='\n\n_This comment will be replaced once the job completes._'
         fi
 
-        JOB_COMMENT_BODY=$(printf '<!-- early-gate-job-url job_url=%s correlation_id=%s -->\n**Early Gate Test - Job Triggered**\n\nThe Jenkins job is now running.\n\n- **Job URL:** %s\n- **FBC Tag:** %s\n- **Correlation ID:** %s'"${REPLACE_NOTE}" \
-          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FBC_TAG}" "${CORRELATION_ID}")
+        JOB_COMMENT_BODY=$(printf '<!-- early-gate-job-url job_url=%s correlation_id=%s -->\n**Early Gate Test - Job Triggered**\n\nThe Jenkins job is now running.\n\n- **Job URL:** %s\n- **FBC Image:** %s\n- **Correlation ID:** %s'"${REPLACE_NOTE}" \
+          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FBC_IMAGE}" "${CORRELATION_ID}")
 
         post_pr_comment "${JOB_COMMENT_BODY}"
         echo "Posted job-url-comment on PR #${PR_NUMBER}"
@@ -606,27 +614,26 @@ spec:
       fi
 
       if [ "${SUMMARY_VALID}" = "true" ]; then
-        if [ "${IS_JOB_FAILURE}" = "true" ]; then
-          RESULT_ICON=":x:"
-          STATUS_DISPLAY="${RESULT_ICON} ${FINAL_STATUS}"
-        elif [ "${FAILED_COUNT}" -gt 0 ]; then
+        # When we have a valid test summary, let test results determine the status
+        # rather than the Jenkins job status (which may be ABORTED even when all tests passed)
+        if [ "${FAILED_COUNT}" -gt 0 ]; then
           RESULT_ICON=":x:"
           STATUS_DISPLAY="${RESULT_ICON} FAILED — ${FAILED_COUNT} test(s) failed"
         else
           RESULT_ICON=":white_check_mark:"
-          STATUS_DISPLAY="${RESULT_ICON} ${FINAL_STATUS}"
+          STATUS_DISPLAY="${RESULT_ICON} PASSED — all ${TOTAL_COUNT} test(s) passed"
         fi
         if [ "${FAILED_COUNT}" -gt 0 ]; then
           FAILED_DISPLAY='$\\color{red}{\\textsf{'"${FAILED_COUNT}"'}}$'
         else
           FAILED_DISPLAY="${FAILED_COUNT}"
         fi
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n%s **Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n| **Results** | [early-gate-test-summary.yaml](%s) |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
-          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${RESULT_ICON}" "${JENKINS_JOB_URL}" "${STATUS_DISPLAY}" "${FBC_TAG}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}" \
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n%s **Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | %s |\n| **FBC Image** | %s |\n| **Correlation ID** | %s |\n| **Results** | [early-gate-test-summary.yaml](%s) |\n\n**Test Summary**\n\n| Passed | Failed | Skipped | Total |\n|--------|--------|---------|-------|\n| %s | %s | %s | %s |' \
+          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${RESULT_ICON}" "${JENKINS_JOB_URL}" "${STATUS_DISPLAY}" "${FBC_IMAGE}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}" \
           "${PASSED_COUNT}" "${FAILED_DISPLAY}" "${SKIPPED_COUNT}" "${TOTAL_COUNT}")
       else
-        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n:warning: **Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | :warning: %s |\n| **FBC Tag** | %s |\n| **Correlation ID** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n[early-gate-test-summary.yaml](%s)' \
-          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_TAG}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}")
+        COMPLETION_BODY=$(printf '<!-- early-gate-job-complete job_url=%s correlation_id=%s -->\n:warning: **Early Gate Test - Complete**\n\n| Field | Value |\n|-------|-------|\n| **Job URL** | %s |\n| **Status** | :warning: %s |\n| **FBC Image** | %s |\n| **Correlation ID** | %s |\n\n:warning: Test results could not be obtained from the expected location:\n[early-gate-test-summary.yaml](%s)' \
+          "${JENKINS_JOB_URL}" "${CORRELATION_ID}" "${JENKINS_JOB_URL}" "${FINAL_STATUS}" "${FBC_IMAGE}" "${CORRELATION_ID}" "${SUMMARY_DISPLAY_URL}")
       fi
 
       post_pr_comment "${COMPLETION_BODY}"
@@ -640,17 +647,27 @@ spec:
       # ---------------------------------------------------------------
       # Determine final pipeline exit code
       # ---------------------------------------------------------------
+      # When we have a valid test summary, the test results are authoritative.
+      # The Jenkins job status (e.g. ABORTED) should not override passing tests.
+      if [ "${SUMMARY_VALID}" = "true" ]; then
+        if [ "${FAILED_COUNT}" -gt 0 ]; then
+          echo "${FAILED_COUNT} test(s) failed. Marking pipeline as failed."
+          exit 1
+        fi
+        if [ "${IS_JOB_FAILURE}" = "true" ]; then
+          echo "Jenkins job ended with status '${FINAL_STATUS}', but all ${TOTAL_COUNT} test(s) passed. Treating as success."
+        fi
+        echo "Early gate test pipeline completed successfully."
+        exit 0
+      fi
+
+      # No valid test summary — fall back to Jenkins job status
       LOWER_STATUS=$(echo "${FINAL_STATUS}" | tr '[:upper:]' '[:lower:]')
 
       if [ "${LOWER_STATUS}" = "failure" ] || [ "${LOWER_STATUS}" = "failed" ] || \
          [ "${LOWER_STATUS}" = "aborted" ] || [ "${LOWER_STATUS}" = "unstable" ] || \
          [ "${LOWER_STATUS}" = "not_built" ]; then
-        echo "Jenkins job ended with status '${FINAL_STATUS}'. Marking pipeline as failed."
-        exit 1
-      fi
-
-      if [ "${SUMMARY_VALID}" = "true" ] && [ "${FAILED_COUNT}" -gt 0 ]; then
-        echo "${FAILED_COUNT} test(s) failed. Marking pipeline as failed."
+        echo "Jenkins job ended with status '${FINAL_STATUS}'. No test summary available. Marking pipeline as failed."
         exit 1
       fi
 
