@@ -3,7 +3,7 @@
 # Ubuntu VM using Docker.
 #
 # Prerequisites: docker, curl, jq
-# Environment:   GITHUB_TOKEN must be set (PAT with admin:org scope)
+# Environment:   GITHUB_TOKEN must be set (PAT with manage_runners:org scope)
 #
 # The admin token is used only by this script to obtain short-lived
 # registration/removal tokens. The containers themselves never see the
@@ -77,7 +77,7 @@ Options:
   --help, -h            Show this help message
 
 Environment variables:
-  GITHUB_TOKEN          Required. PAT with admin:org scope
+  GITHUB_TOKEN          Required. PAT with manage_runners:org scope
   GITHUB_ORG            GitHub organization (default: red-hat-data-services)
   RUNNER_VERSION        Runner binary version (default: 2.334.0)
   CONTAINER_CPUS        CPU limit per container (default: 2)
