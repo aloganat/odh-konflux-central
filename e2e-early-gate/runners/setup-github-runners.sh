@@ -3,7 +3,7 @@
 # Ubuntu VM using Docker.
 #
 # Prerequisites: docker, curl, jq
-# Environment:   GITHUB_TOKEN must be set (PAT with manage_runners:org scope)
+# Environment:   GITHUB_TOKEN must be set (PAT with admin:org scope)
 #
 # The admin token is used only by this script to obtain short-lived
 # registration/removal tokens. The containers themselves never see the
@@ -77,7 +77,7 @@ Options:
   --help, -h            Show this help message
 
 Environment variables:
-  GITHUB_TOKEN          Required. PAT with manage_runners:org scope
+  GITHUB_TOKEN          Required. PAT with admin:org scope
   GITHUB_ORG            GitHub organization (default: red-hat-data-services)
   RUNNER_VERSION        Runner binary version (default: 2.334.0)
   CONTAINER_CPUS        CPU limit per container (default: 2)
@@ -150,7 +150,20 @@ github_api() {
         sleep $((attempt * 2))
         ;;
       401) die "Authentication failed (401). Verify GITHUB_TOKEN is valid." ;;
-      403) die "Forbidden (403). Token may lack permissions or org requires SSO authorization." ;;
+      403)
+        local required_scope="admin:org"
+        local action_hint=""
+        case "${endpoint}" in
+          */actions/runners/registration-token)
+            action_hint="Registering runners requires 'admin:org' scope." ;;
+          */actions/runners/remove-token)
+            action_hint="Removing runners requires 'admin:org' scope." ;;
+          */actions/runners*)
+            action_hint="Listing runners requires 'admin:org' scope." ;;
+          *)
+            action_hint="This endpoint may require 'admin:org' or 'read:org' scope." ;;
+        esac
+        die "Forbidden (403) on ${method} ${endpoint}. ${action_hint} Check your token scopes at: GitHub → Settings → Developer settings → Personal access tokens (classic)." ;;
       404) die "Not found (404). Check GITHUB_ORG='${GITHUB_ORG}'." ;;
       *)   die "GitHub API returned ${http_code}: ${body}" ;;
     esac
