@@ -273,7 +273,86 @@ merge:
 
 ---
 
-## 7. Limitations
+## 7. Onboarding a Repository to Early Gate
+
+To enable early gate testing on a new repository, use the **ODH Early Gate Onboarder** workflow in the `odh-konflux-central` repository.
+
+### How to Onboard
+
+1. Navigate to the [ODH Early Gate Onboarder workflow](https://github.com/opendatahub-io/odh-konflux-central/actions/workflows/odh-early-gate-onboarder.yml)
+2. Click **Run workflow**
+3. Fill in the required inputs:
+
+| Input | Description | Example |
+|-------|-------------|---------|
+| **Repository name** | The component/operator repository to onboard (without `opendatahub-io/` prefix) | `kserve`, `model-mesh`, `feast` |
+| **Target branch** | The branch in the component repo where early-gate should run | `main`, `v2.0`, `release-1.x` |
+
+### What the Workflow Does
+
+The onboarder workflow automates the complete setup:
+
+1. **Copies pipeline files** to the component repository:
+   - `.tekton/early-gate-ci-build.yaml` — early gate build pipeline
+   - `.tekton/early-gate-ci-test.yaml` — early gate test pipeline
+   - Creates a PR in the component repository with these files
+
+2. **Updates the early-gate configuration**:
+   - Adds the repository to `config/early-gate-config.yaml` in `odh-konflux-central`
+   - Sets `early-gate-enabled: true`
+   - Adds `additional-branches` if the target branch is not `main` or `master`
+   - Creates a PR in `odh-konflux-central` with the config update
+
+### Configuration Format
+
+**For repositories using main/master branch:**
+```yaml
+repositories:
+  my-component:
+    early-gate-enabled: true
+```
+
+**For repositories using other branches:**
+```yaml
+repositories:
+  my-component:
+    early-gate-enabled: true
+    additional-branches:
+      - v2.0
+```
+
+### Re-running the Workflow
+
+If you run the onboarder workflow for a repository that's already configured:
+- The workflow detects the existing entry
+- Shows the current configuration
+- Exits without creating duplicate PRs
+
+### Initial Onboarding Period
+
+> **Note:** During the initial rollout phase (first few weeks), the DevOps team will handle repository onboarding to ensure proper setup and validate the automated workflow. If you need to onboard a new repository, please reach out to the DevOps team.
+
+---
+
+## 8. Pros and Cons
+
+### Pros
+
+- **Early Detection of Integration Issues** — Catches breaking changes before merge, reducing the risk of broken main branches and preventing downstream failures
+- **Faster Feedback Loop** — Developers get test results within their PR review cycle, eliminating the need to wait for post-merge CI to discover issues
+- **Increased Confidence in Merges** — PRs that pass early gate testing have been validated against the full operator and component stack, reducing merge anxiety
+- **Reduced Debugging Time** — Issues are caught in the context of the specific PR that caused them, making root cause analysis faster and easier
+
+### Cons
+
+- **Cloud Infrastructure Costs** — Each early gate run provisions a dedicated ROSA HCP cluster for testing, which incurs AWS infrastructure costs that scale with PR volume
+- **Jenkins Infrastructure Scaling** — Increased test load requires scaling Jenkins executors and managing queue times during peak PR activity
+- **Longer PR Feedback Time** — Full early gate test cycles can take 30-45 minutes, which is slower than standard unit/integration tests
+- **Resource Contention** — High PR volume can lead to queued test runs and resource contention, potentially delaying feedback for some PRs
+
+---
+
+## 9. Limitations
 
 - **ODH repos only** — early gate testing currently supports only ODH repository builds. RHDS and RHOAI builds are not supported yet.
 - **Single architecture only** — early gate testing currently supports x86 architecture only.
