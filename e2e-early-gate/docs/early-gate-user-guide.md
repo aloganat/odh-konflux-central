@@ -273,7 +273,7 @@ merge:
 
 ---
 
-## 6. Limitations
+## 7. Limitations
 
 - **ODH repos only** — early gate testing currently supports only ODH repository builds. RHDS and RHOAI builds are not supported yet.
 - **Single architecture only** — early gate testing currently supports x86 architecture only.
