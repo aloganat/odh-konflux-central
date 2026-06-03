@@ -45,22 +45,16 @@ RHOAI releases lack an automated mechanism to block a release when critical test
 ```mermaid
 flowchart TD
     A["Jenkins CI Pipeline"]
-    B["Test Artifacts (XML Results)"]
-    C["ReportPortal (Launch Data)"]
-    D["Create/Update Jira with Test Results"]
-    E["First Level Failure Analyser Skill"]
-    H["Org Pulse Dashboard (Phase 2)"]
-    G["Release Gate Decision"]
 
-    A --> B
-    A --> C
-    B --> D
-    C --> D
-    D --> E
-    D --> H
-    B --> H
-    C --> H
-    D --> G
+    A --> B["Test Artifacts (XML Results)"]
+    A --> C["ReportPortal (Launch Data)"]
+
+    B & C --> D["Create/Update Jira\nwith Test Results"]
+
+    D --> E["First Level Failure\nAnalyser Skill"]
+    D --> H["Org Pulse Dashboard\n(Phase 2)"]
+    D --> G["Release Gate Decision"]
+
     H --> G
 
     style A fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
