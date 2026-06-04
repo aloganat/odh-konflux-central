@@ -34,12 +34,15 @@ RHOAI releases lack an automated mechanism to block a release when critical test
 
 | Phase | Target | Description |
 |-------|--------|-------------|
-| **Phase 1: Bulk Blockers** | 3.5 EA2 (Immediate) | Adapt existing test status jira updater to mark TFA Sign-Off Jiras as **Blocker** when moving to Backlog on failure or skipped tests. Skipped tests treated same as failures. New Failure Analyser skill for first-level analysis and bug linking. JQL release gate for go/no-go. Update COMPONENT_CONFIG with new components. |
+| **Phase 1: Per-Test Bug Creation** | 3.5 EA2 (Immediate) | TFA Jira management remains the same — additionally, create Bugs for each failed/skipped test combination or reuse existing Bugs, and link them to the TFA JIRA. Bug description updated with fail/skipped status across all executions (across cloud providers and different environments) — bug stays open if it failed/skipped in any execution (human-in-the-loop validation required). TFA JIRAs also marked as Blocker when in Backlog state. TFA JIRAs assigned to QE Component Leads. Product Sign-Off JIRAs assigned to Component Managers with consolidated report. Product Sign-Off blocked if open TFA JIRAs or open bugs exist. |
 | **Phase 2: Dashboard Visibility** | 3.5 Stable | Org Pulse dashboard (RHOAIENG-65207) providing unified quality gate visibility. Release health overview + per-component drill-down. Data from ReportPortal, Jira, and other quality gates. |
-| **Phase 3: Fine-Grained JIRAs** | TBD (Needs discussion) | Per-test blocker Jiras with automated lifecycle (auto-resolve, auto-reopen, escalation). Deferred pending discussion on deduplication and threshold strategies. |
 | **Test Stabilization** | Ongoing (Component Teams) | Each component team owns their test stability. Quarantine flaky tests, fix automation bugs within 2 days SLA. |
 
-> **Note — Key challenge for Phase 3:** Test scripts are written with a **one-to-many relationship** — a single test script in GitHub runs with more than one possible combination at runtime. One test file maps to multiple executions in ReportPortal, making per-test Jira creation complex. This can generate 100+ JIRAs per RC cycle without careful deduplication and grouping strategies.
+> **Note — Scope:** Per-test Bug creation for failed and skipped tests is **applicable only during RC builds (post code freeze)**. For nightly and weekly gate executions, the process remains unchanged — only TFA Sign-Off JIRAs are created and resolved by QE Leads (same as current process). No individual test-level Bug JIRAs are created for nightly/weekly runs.
+
+> **Note — Deduplication:** If the same test fails across multiple test environments (e.g., connected, disconnected, GPU), only **one Bug** is created or an existing Bug is reused and linked to the TFA JIRA. The Bug description is updated with fail/skipped status across all executions (across cloud providers and different environments). The Bug stays open if it failed/skipped in any execution — human-in-the-loop validation is required before closure.
+
+> **Note — Test naming convention:** Test scripts are written with a **one-to-many relationship** — a single test script in GitHub runs with more than one possible combination at runtime. We follow the test name that we get during runtime by considering the combination parameter for the test script, as it brings more clarity in what combination it failed or skipped.
 
 ---
 
@@ -47,50 +50,51 @@ RHOAI releases lack an automated mechanism to block a release when critical test
 
 ```mermaid
 flowchart TD
-    A["Jenkins CI Pipeline"]
+    A["Jenkins CI Pipeline\n(RC Build — Post Code Freeze)"]
 
     A --> B["Test Artifacts (XML Results)"]
     A --> C["ReportPortal (Launch Data)"]
 
-    B & C --> D["Create/Update Jira\nwith Test Results"]
+    B & C --> D["Create/Update TFA JIRAs\n+ Create Bugs per Failed/Skipped Test\n(deduplicated across environments)"]
 
     D --> E["First Level Failure\nAnalyser Skill"]
+
+    D --> F["Link Bugs to\nComponent TFA JIRAs\n(Assigned to QE Leads)"]
+
+    F --> G["Product Sign-Off JIRA\n(per component)\nConsolidated report of\nopen TFA JIRAs + open Bugs\n(Assigned to Component Manager)"]
+
     D --> H["Org Pulse Dashboard\n(Phase 2)"]
-    D --> G["Release Gate Decision"]
 
-    H --> G
+    G --> I["Release Gate Decision\nBlocked if open TFA JIRAs\nor open Bugs exist"]
 
-    G --> S["Scan Unresolved TFA Blockers\nLabel each: management-sign-off-needed"]
+    H --> I
 
-    S --> T["Post Report on\nProduct Sign-Off JIRA\n(per component)"]
+    I --> J["Director Reviews\nProduct Sign-Off JIRA\n(exceptions only)"]
 
-    T --> R["Director Reviews\nProduct Sign-Off JIRA\nLabel: management-sign-off-done"]
-
-    R --> X["Release Proceeds"]
+    J --> K["Release Proceeds"]
 
     style A fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
     style B fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
     style C fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
-    style D fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
+    style D fill:#D5D0E5,stroke:#9B93B3,color:#1a1a1a
     style E fill:#D5D0E5,stroke:#9B93B3,color:#1a1a1a
-    style G fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
+    style F fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
+    style G fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
     style H fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
-    style S fill:#D5D0E5,stroke:#9B93B3,color:#1a1a1a
-    style T fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
-    style R fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
-    style X fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
+    style I fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
+    style J fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
+    style K fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
 ```
 
 **How it works:**
 
-- **Jenkins CI Pipeline** executes test suites (test matrix, disconnected install/upgrade, connected upgrade, GPU) and produces two outputs: XML test artifacts and ReportPortal launch data.
-- **Create/Update Jira with Test Results** — the existing automation reads XML results and ReportPortal data, maps components via COMPONENT_CONFIG (externalized), and updates TFA Sign-Off Jiras. Passed components are closed; failed or skipped components are moved to Backlog with Blocker priority.
-- **First Level Failure Analyser Skill** — triggered from Jenkins, this skill performs automated analysis using pod logs. It searches for existing related bugs and links them, or creates a new bug if none are found.
-- **Org Pulse Dashboard (Phase 2)** — aggregates data from XML results, ReportPortal, and Jira to provide a unified quality gate view for leadership and release managers.
-- **Release Gate Decision** — driven by JQL query against Jira and dashboard status. If any TFA Sign-Off Jira is at Blocker priority in Backlog, the release is blocked.
-- **Scan Unresolved TFA Blockers** — automated utility scans all TFA Sign-Off JIRAs at release gate. Each unresolved TFA blocker JIRA is labeled `management-sign-off-needed` for per-execution audit trail.
-- **Post Report on Product Sign-Off JIRA** — the utility posts a consolidated report comment on each component's existing Product Sign-Off JIRA (e.g., `[RHOAI 3.5.0-EA1] Product Sign Off - AI Hub Team`), listing all unresolved TFA blockers with failed/skipped tests and RP links.
-- **Director Reviews Product Sign-Off JIRA** — directors review the report on their component's Product Sign-Off JIRA (one per component), understand exactly what tests they are signing off on, and add `management-sign-off-done` label on the Product Sign-Off JIRA. This single action covers all linked TFA blockers for that component. Release proceeds only after all components have director sign-off.
+- **Jenkins CI Pipeline** executes test suites during RC builds (post code freeze) and produces two outputs: XML test artifacts and ReportPortal launch data.
+- **Create/Update TFA JIRAs + Create Bugs** — TFA Jira management remains the same. Additionally, the automation creates individual **Bug JIRAs for each failed/skipped test combination** or reuses existing Bugs, and links them to the component's TFA JIRA. TFA JIRAs are also marked as Blocker when in Backlog state. The Bug description is updated with fail/skipped status across all executions and environments (e.g., "Failed in disconnected, Skipped in GPU, Passed in connected"). The Bug **stays open** as long as it has failed or skipped in any execution — human-in-the-loop validation is required before closure.
+- **First Level Failure Analyser Skill** — triggered from Jenkins, this skill performs automated analysis using pod logs to classify each bug (Product Bug / Automation Bug / Environment Issue).
+- **Link Bugs to TFA JIRAs** — each Bug is linked to the relevant component's TFA Sign-Off JIRA. TFA JIRAs are assigned to **QE Component Leads** for triage and resolution.
+- **Product Sign-Off JIRA** — the existing Product Sign-Off JIRA per component (e.g., `[RHOAI 3.5.0-EA1] Product Sign Off - AI Hub Team`) receives a consolidated report of all unresolved TFA JIRAs and open failed/skipped test Bugs. Assigned to **Component Managers** for management visibility.
+- **Release Gate Decision** — the Product Sign-Off JIRA **cannot be resolved** if there are open TFA JIRAs or open Bug JIRAs, unless explicitly called out as exceptions with director acknowledgment.
+- **Org Pulse Dashboard (Phase 2)** — aggregates data from ReportPortal and Jira to provide a unified quality gate view.
 
 **Release Gate JQL:**
 
@@ -106,26 +110,27 @@ If this returns > 0 results, the release is blocked. Director sign-off via the P
 
 ## 4. TFA Jira Lifecycle Flowcharts
 
-### 4.1  Phase 1 — TFA Sign-Off Lifecycle per Component (Adapted Existing Automation)
+### 4.1  Phase 1 — Per-Test Bug Creation with TFA Sign-Off Lifecycle (RC Builds Only)
 
 ```mermaid
 flowchart TD
-    A["TEST PIPELINE RUNS\n(Jenkins: test matrix / disc install /\ndisc upgrade / conn upgrade / GPU)"]
-    B["PARSE XML RESULTS\nper component"]
+    A["RC BUILD PIPELINE RUNS\n(Post Code Freeze)\n\nNote: Nightly/weekly runs follow\nexisting process — TFA JIRAs only,\nno per-test Bugs"]
+    B["PARSE TEST RESULTS\nper component per test"]
     C["ALL PASSED\n0 failures, 0 skipped"]
     D["ANY FAILED"]
     E["ANY SKIPPED\n(treated same as failed)"]
-    F["TFA Sign-Off: CLOSE\n\nAdd 'ALL PASSED' comment + RP link\n\nFail-safe: if previously in\nBacklog, keep it in Backlog"]
-    G["TFA Sign-Off: BACKLOG + BLOCKER\n\nSet Priority: BLOCKER\nReassign to Component Lead\nWith Test Result Details"]
-    H["Failure Analyser Skill\n\nFirst-level analysis using pod logs.\nIf existing Jira found: link to parent test execution Jira.\nIf not: create new Jira and link it."]
-    M["COMPONENT TEAM INVESTIGATES\n\nClassify the bug in ReportPortal and fix it.\nHave a valid reason for skipped cases\nin RP per test level."]
-    N["ALL ADDRESSED\n\nResolve TFA Sign-Off Jira\nResolve/Close linked bugs"]
-    O["FAILURES PERSIST\nIN NEXT RC BUILD\n\nTFA Sign-Off stays\nBLOCKER in BACKLOG"]
-    P["TFA Sign-Off RESOLVED"]
-    Q["TIER 1: LABEL EACH TFA BLOCKER\n\nAuto-label each unresolved TFA JIRA:\nmanagement-sign-off-needed\n(per-execution audit trail)"]
-    R["TIER 2: POST REPORT ON\nPRODUCT SIGN-OFF JIRA\n\nConsolidated report comment on\nexisting Product Sign-Off JIRA\nper component (e.g. RHOAIENG-61865)"]
-    S["DIRECTOR REVIEWS\nPRODUCT SIGN-OFF JIRA\n\nReview failed + skipped tests\nwith RP links per component\nLabel: management-sign-off-done"]
-    T["RELEASE PROCEEDS"]
+    F["TFA Sign-Off: CLOSE\n\nAdd 'ALL PASSED' comment + RP link"]
+    G["CREATE OR REUSE BUG\nPER FAILED/SKIPPED TEST\n\nCreate new Bug or reuse existing\nLink to component TFA JIRA\nUpdate with fail/skipped status\nacross all environments\n\nBug stays OPEN if failed/skipped\nin any execution (human validation)"]
+    H["LINK BUGS TO\nCOMPONENT TFA JIRA\n\nTFA JIRA assigned to QE Lead\nTFA marked BLOCKER when\nin Backlog state"]
+    I["Failure Analyser Skill\n\nFirst-level analysis using pod logs.\nClassify: Product Bug /\nAutomation Bug / Environment Issue"]
+    J["QE LEAD INVESTIGATES\n\nClassify bugs in ReportPortal.\nHave valid reason for skipped cases\nin RP per test level.\nDrive resolution within team."]
+    K["ALL BUGS RESOLVED\n\nResolve TFA Sign-Off Jira\nClose linked Bugs"]
+    L["OPEN BUGS REMAIN\n\nTFA JIRA stays BLOCKER\nOpen Bugs block\nProduct Sign-Off"]
+    M["TFA Sign-Off RESOLVED"]
+    N["PRODUCT SIGN-OFF JIRA\n(Assigned to Component Manager)\n\nConsolidated report:\n• Open TFA JIRAs\n• Open failed/skipped test Bugs\n• RP links per test"]
+    O["PRODUCT SIGN-OFF\nBLOCKED\n\nCannot resolve if open\nTFA JIRAs or open Bugs exist\nunless explicit exception"]
+    P["EXCEPTIONS CALLED OUT\n\nDirector acknowledges\nLabel: management-sign-off-done"]
+    Q["PRODUCT SIGN-OFF\nRESOLVED"]
 
     A --> B
     B --> C
@@ -135,14 +140,16 @@ flowchart TD
     D --> G
     E --> G
     G --> H
-    H --> M
+    H --> I
+    I --> J
+    J --> K
+    J --> L
+    K --> M
     M --> N
-    M --> O
-    N --> P
-    O --> Q
-    Q --> R
-    R --> S
-    S --> T
+    L --> N
+    N --> O
+    O --> P
+    P --> Q
 
     style A fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
     style B fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
@@ -150,16 +157,17 @@ flowchart TD
     style D fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
     style E fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
     style F fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
-    style G fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
-    style H fill:#D5D0E5,stroke:#9B93B3,color:#1a1a1a
+    style G fill:#D5D0E5,stroke:#9B93B3,color:#1a1a1a
+    style H fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
+    style I fill:#D5D0E5,stroke:#9B93B3,color:#1a1a1a
+    style J fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
+    style K fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
+    style L fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
     style M fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
     style N fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
     style O fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
-    style P fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
-    style Q fill:#D5D0E5,stroke:#9B93B3,color:#1a1a1a
-    style R fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
-    style S fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
-    style T fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
+    style P fill:#E8C4C4,stroke:#B58585,color:#1a1a1a
+    style Q fill:#D6E4F0,stroke:#7A9CC6,color:#1a1a1a
 ```
 
 ---
@@ -176,65 +184,69 @@ flowchart TD
 
 ## 6. Director-Level Sign-Off Workflow
 
-Directors must have full visibility into what tests they are signing off on at the time of release. This uses a **two-tier approach** — individual TFA blockers are labeled for audit, but directors act on the existing **Product Sign-Off JIRA** (one per component, already auto-created by `generate_jira.py`, e.g., `[RHOAI 3.5.0-EA1] Product Sign Off - AI Hub Team`).
+Directors must have full visibility into what tests they are signing off on at the time of release. This uses the existing **Product Sign-Off JIRA** (one per component, already auto-created by `generate_jira.py`, e.g., `[RHOAI 3.5.0-EA1] Product Sign Off - AI Hub Team`).
 
-**Tier 1 — Individual TFA Blocker JIRAs (automated, per-execution tracking):**
-- `management-sign-off-needed` is auto-applied to **every unresolved TFA blocker JIRA** individually
-- This ensures each test execution blocker is tracked and auditable
-- When a TFA blocker is resolved (team fixes the issue or test passes in next RC), the label is automatically removed
-- Directors can query all pending items across all components if needed
+**Product Sign-Off JIRA — gating rules:**
 
-**Tier 2 — Product Sign-Off JIRA (director review point, one per component):**
-- The automated utility posts a consolidated report comment on each component's **existing Product Sign-Off JIRA**, listing all unresolved TFA blockers with failed/skipped test details and RP links
-- `management-sign-off-needed` is also applied to the Product Sign-Off JIRA if any TFA blockers are unresolved
-- Director reviews the report on **one JIRA per component** — no need to open each TFA blocker individually
-- After review, director adds `management-sign-off-done` on the **Product Sign-Off JIRA only** — this single action covers all linked TFA blockers for that component
-- The Product Sign-Off JIRA cannot be moved to Resolved until all TFA blockers are either resolved or have director sign-off
+- Product Sign-Off JIRAs are assigned to **Component Managers** (not QE leads) to give management visibility into open failed and skipped tests.
+- The Product Sign-Off JIRA **cannot be resolved** if there are:
+  - Open (unresolved) TFA Sign-Off JIRAs for the component, OR
+  - Open failed/skipped test Bug JIRAs linked to those TFA JIRAs
+- **Exception:** The Product Sign-Off can be resolved only if unresolved items are explicitly called out as exceptions with documented justification and director acknowledgment. The director adds `management-sign-off-done` label to confirm the exception.
 
-**Report comment format on Product Sign-Off JIRA:**
+**Automated report on Product Sign-Off JIRA:**
+
+The automation posts a consolidated report comment listing all unresolved TFA JIRAs and open Bugs:
 
 ```
 ## Test Failure Sign-Off Report — RC3
 
-### Unresolved Blockers: 2
+### Open TFA JIRAs: 2 | Open Bugs: 5
 
-| Test Cycle | Status | Failed | Skipped | TFA JIRA | RP Link |
-|------------|--------|--------|---------|----------|---------|
-| Test Matrix | BLOCKER | 3 | 0 | RHOAIENG-12345 | [Launch] |
-| Disconnected Install | BLOCKER | 0 | 5 | RHOAIENG-12346 | [Launch] |
+| TFA JIRA | Test Cycle | Status | Open Bugs | RP Link |
+|----------|------------|--------|-----------|---------|
+| RHOAIENG-12345 | Test Matrix | BLOCKER | 3 | [Launch] |
+| RHOAIENG-12346 | Disconnected Install | BLOCKER | 2 | [Launch] |
 
-### Failed Tests:
-- test_inference_endpoint — Product Bug — RHOAIENG-12350
-- test_scaling_policy — Automation Bug — RHOAIENG-12351
+### Open Failed Test Bugs:
+- RHOAIENG-12350 — test_inference_endpoint — Product Bug
+  Connected: ✅ Passed | Disconnected: ❌ Failed | GPU: ❌ Failed
+- RHOAIENG-12351 — test_scaling_policy — Automation Bug
+  Connected: ❌ Failed | Disconnected: ❌ Failed | GPU: N/A
+- RHOAIENG-12352 — test_model_deploy — Environment Issue
+  Connected: ✅ Passed | Disconnected: ✅ Passed | GPU: ❌ Failed
 
-### Skipped Tests (5):
-- Reason: Parent fixture failure (all 5)
+### Open Skipped Test Bugs:
+- RHOAIENG-12353 — test_gpu_allocation — Parent fixture failure
+- RHOAIENG-12354 — test_pipeline_run — Unknown (needs investigation)
 
-⚠️ Director sign-off required. Add label: management-sign-off-done
+Note: Bugs stay open if failed/skipped in any execution.
+QE Lead must validate before closure.
+
+⚠️ Product Sign-Off cannot be resolved with open items.
+   Call out exceptions explicitly for director sign-off.
 ```
 
-**Edge case — new failures after director sign-off:**
-- If a subsequent RC build introduces new failures, new TFA blockers get `management-sign-off-needed`
-- The automation removes `management-sign-off-done` from the Product Sign-Off JIRA and posts an updated report
-- Director must re-review and re-sign-off
+**Edge case — new failures after sign-off:**
 
-**Sign-Off JQL (release manager checks):**
+- If a subsequent RC build introduces new failures, new Bugs are created and linked to TFA JIRAs
+- The automation removes `management-sign-off-done` from the Product Sign-Off JIRA and posts an updated report
+- Director must re-review and re-sign-off for exceptions
+
+**Sign-Off JQL (release manager — pending sign-offs):**
 
 ```
 project = RHOAIENG AND fixVersion = "rhoai-X.Y.Z"
   AND summary ~ "Product Sign Off"
-  AND labels = "management-sign-off-needed"
-  AND labels != "management-sign-off-done"
+  AND status NOT IN (Resolved, Closed)
 ```
 
-If this returns > 0, director sign-off is still pending for some components.
-
-**TFA Blocker audit JQL (all unresolved blockers across components):**
+**Open Bugs JQL (all unresolved test bugs for a release):**
 
 ```
 project = RHOAIENG AND fixVersion = "rhoai-X.Y.Z"
-  AND labels = "management-sign-off-needed"
-  AND summary ~ "TFA Sign-Off"
+  AND issuetype = Bug AND labels = "test-failure-bug"
+  AND status NOT IN (Resolved, Closed)
 ```
 
 ---
@@ -259,5 +271,6 @@ project = RHOAIENG AND fixVersion = "rhoai-X.Y.Z"
 - **Flaky tests cause blocker fatigue** (High) — Mitigated by parallel stabilization track; consider quarantining flaky tests with >N% fail rate
 - **Skipped tests treated as blockers** (Medium) — Only unknown/unexplained skips are treated as true blockers
 - **Component alias mapping out of sync** (Medium) — Mitigated by externalizing COMPONENT_CONFIG to YAML and implementing auto-update mechanism
-- **Jira explosion in Phase 3** (High) — Test scripts have one-to-many runtime combinations; deferred pending discussion on grouping strategy (per-script vs per-combination) and thresholds
-- **Director sign-off bottleneck** (Medium) — Mitigated by providing a clear, pre-compiled sign-off report with all context so directors can review efficiently
+- **Bug deduplication accuracy** (Medium) — Same test failing in different environments must be correctly identified as one Bug. Requires reliable test name matching across environments.
+- **Director sign-off bottleneck** (Medium) — Mitigated by consolidated report on Product Sign-Off JIRA; directors review one JIRA per component with full context
+- **Nightly/weekly vs RC scope confusion** (Low) — Clear documentation that per-test Bug creation is RC-only; nightly/weekly follows existing TFA-only process
